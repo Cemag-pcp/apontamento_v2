@@ -40,6 +40,7 @@
                         <option value="">Todos</option>
                         <option value="true">Sim</option>
                         <option value="false" selected>Nao</option>
+                        <option value="aguardando">Aguardando confirmação no ERP</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -130,6 +131,7 @@
 <div id="erpApontamentosConfig"
      data-api-url="{% url 'montagem:api_erp_apontamentos_montagem' %}"
      data-apontar-url-template="{% url 'montagem:api_erp_apontar_item_montagem' 0 %}"
+     data-resolver-url-template="{% url 'montagem:api_erp_resolver_aguardando_montagem' 0 %}"
      data-csrf-token="{{ csrf_token }}">
 </div>
 

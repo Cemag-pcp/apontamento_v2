@@ -32,6 +32,18 @@ import requests
 from datetime import date
 
 from core.utils import notificar_ordem
+from core.permissoes import tem_subacesso
+from core.erp_apontamento import (
+    TIMEOUT_ERP_APONTAMENTO,
+    marcar_aguardando_confirmacao_erp,
+    resolver_aguardando_erp,
+    resposta_aguardando_erp,
+    resposta_incerta,
+    resposta_item_bloqueado,
+)
+
+# Sub-acesso da tela /usinagem/ (ver core/permissoes.py e a migracao de sub-acessos)
+SUBACESSO_PLANEJAR = 'usinagem#planejar'
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -88,7 +100,7 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
                 .filter(pk=item_id, ordem__grupo_maquina='usinagem')
                 .first()
             )
-            if not item or item.apontado:
+            if not item or item.apontado or item.aguardando_confirmacao_erp:
                 return
 
             user_ref = user if getattr(user, 'is_authenticated', False) else None
@@ -129,16 +141,20 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
             except requests.RequestException as exc:
+                if resposta_incerta(exc):
+                    # pode ter entrado no ERP: bloqueia até alguém conferir
+                    marcar_aguardando_confirmacao_erp(item, user_ref, exc)
+                    return
                 item.erro_apontamento = str(exc)[:2000]
                 item.tipo_apontamento = 'api'
                 item.resp_apontamento = user_ref
@@ -234,7 +250,8 @@ def planejamento(request):
                                                                       'motivos_maquina_parada':motivos_maquina_parada,
                                                                       'motivos_exclusao': motivos_exclusao,
                                                                       'processos': processos,
-                                                                      'setor_usinagem_id': setor_usinagem.id if setor_usinagem else ''})
+                                                                      'setor_usinagem_id': setor_usinagem.id if setor_usinagem else '',
+                                                                      'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
 
 def processos(request):
 
@@ -242,7 +259,8 @@ def processos(request):
     operadores = Operador.objects.filter(setor__nome='usinagem')
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia').exclude(nome='Finalizada parcial')
 
-    return render(request, 'apontamento_usinagem/processos.html', {'motivos':motivos,'operadores':operadores,'motivos_maquina_parada':motivos_maquina_parada,})
+    return render(request, 'apontamento_usinagem/processos.html', {'motivos':motivos,'operadores':operadores,'motivos_maquina_parada':motivos_maquina_parada,
+                                                                   'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
 
 def get_pecas_ordem(request, pk_ordem):
     try:
@@ -428,6 +446,44 @@ def retirar_ordem_prioridade(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON invalido.'}, status=400)
 
+def _ordens_interrompidas_mesma_peca(ordem):
+    """Ordens interrompidas da usinagem com alguma peça da `ordem`, a mais
+    recente primeiro (para a trava ao iniciar uma ordem nova)."""
+    pecas_ids = PecasOrdem.objects.filter(ordem=ordem).values_list('peca_id', flat=True)
+    interrompidas = (
+        Ordem.objects.filter(
+            grupo_maquina='usinagem',
+            status_atual='interrompida',
+            excluida=False,
+            ordem_pecas_usinagem__peca_id__in=pecas_ids,
+        )
+        .exclude(pk=ordem.pk)
+        .select_related('maquina')
+        .distinct()
+        .order_by('-ultima_atualizacao')
+    )
+
+    resultado = []
+    for interrompida in interrompidas:
+        ultimo = (
+            interrompida.processos.filter(motivo_interrupcao__isnull=False)
+            .select_related('motivo_interrupcao')
+            .order_by('-data_inicio')
+            .first()
+        )
+        peca = interrompida.ordem_pecas_usinagem.select_related('peca').order_by('id').first()
+        resultado.append({
+            'id': interrompida.id,
+            'ordem': interrompida.ordem,
+            'maquina': interrompida.maquina.nome if interrompida.maquina else None,
+            'maquina_id': interrompida.maquina_id,
+            'motivo': ultimo.motivo_interrupcao.nome if ultimo else None,
+            'peca': f'{peca.peca.codigo} - {peca.peca.descricao}' if peca else '',
+            'interrompida_em': localtime(ultimo.data_inicio).strftime('%d/%m/%Y %H:%M') if ultimo else '',
+        })
+    return resultado
+
+
 def atualizar_status_ordem(request):
     if request.method == 'PATCH':
         try:
@@ -447,6 +503,16 @@ def atualizar_status_ordem(request):
 
                 # Obtém a ordem
                 ordem = Ordem.objects.get(pk=ordem_id)
+
+                # Trava: não inicia uma ordem nova se a mesma peça está numa
+                # ordem interrompida; a tela pergunta se reinicia aquela.
+                if status == 'iniciada' and ordem.status_atual == 'aguardando_iniciar':
+                    interrompidas = _ordens_interrompidas_mesma_peca(ordem)
+                    if interrompidas:
+                        return JsonResponse({
+                            'error': 'Já existe ordem interrompida com esta peça.',
+                            'interrompidas': interrompidas,
+                        }, status=409)
 
                 if status == 'iniciada' and maquina_nome:
                     ordem_em_andamento = Ordem.objects.filter(
@@ -912,6 +978,9 @@ def _criar_ordem_usinagem(dados):
 @csrf_exempt
 def planejar_ordem_usinagem(request):
 
+    if request.method == 'POST' and not tem_subacesso(request.user, SUBACESSO_PLANEJAR):
+        return JsonResponse({'error': 'Você não tem permissão para planejar ordens.'}, status=403)
+
     if request.method == 'POST':
 
         content_type = request.content_type or ''
@@ -1060,6 +1129,8 @@ def api_erp_apontamentos_usinagem(request):
         queryset = queryset.filter(apontado=True)
     elif filtros['apontado'] == 'false':
         queryset = queryset.filter(apontado=False)
+    elif filtros['apontado'] == 'aguardando':
+        queryset = queryset.filter(aguardando_confirmacao_erp=True)
 
     data_apontamento_inicio = parse_date(filtros['data_apontamento_inicio']) if filtros['data_apontamento_inicio'] else None
     data_apontamento_fim = parse_date(filtros['data_apontamento_fim']) if filtros['data_apontamento_fim'] else None
@@ -1100,6 +1171,7 @@ def api_erp_apontamentos_usinagem(request):
             'tipo_apontamento': item.tipo_apontamento or '',
             'chave_apontamento': item.chave_apontamento or '',
             'erro_apontamento': item.erro_apontamento or '',
+            'aguardando_confirmacao_erp': item.aguardando_confirmacao_erp,
             'resp_apontamento': nome_resp,
             'resp_apontamento_username': resp.username if resp else '',
             'data_producao': localtime(item.data).strftime('%d/%m/%Y %H:%M') if item.data else '',
@@ -1181,6 +1253,12 @@ def api_erp_apontar_item_usinagem(request, pk):
                 status=409
             )
 
+        # a ordem é apontada uma vez só: outro item dela aguardando confirmação também bloqueia
+        if item.aguardando_confirmacao_erp or PecasOrdem.objects.filter(
+            ordem_id=item.ordem_id, aguardando_confirmacao_erp=True
+        ).exists():
+            return resposta_item_bloqueado()
+
         if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
             msg_qtd_morta = (
                 'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
@@ -1218,16 +1296,19 @@ def api_erp_apontar_item_usinagem(request, pk):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
             except requests.RequestException as exc:
+                if resposta_incerta(exc):
+                    marcar_aguardando_confirmacao_erp(item, request.user, exc)
+                    return resposta_aguardando_erp(payload_integracao)
                 return JsonResponse(
                     {
                         'status': 'error',
@@ -1364,7 +1445,9 @@ def api_ordens_finalizadas(request):
                 p.codigo AS peca,
                 p.descricao AS descricao,
                 ope.qtd_planejada AS total_planejada,
-                ope.qtd_boa - ope.qtd_morta as total_produzido,
+                -- qtd_boa já é só as boas (a tela pede "Qt. peças boas" e
+                -- "Qt. mortas" separadas): não descontar as mortas de novo
+                ope.qtd_boa as total_produzido,
                 TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 CONCAT(f.matricula, ' - ', f.nome) AS operador,
@@ -1445,3 +1528,14 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+
+
+@login_required
+@require_POST
+def api_erp_resolver_aguardando_usinagem(request, pk):
+    """Confirmar que entrou no ERP / liberar para reenviar (ver core/erp_apontamento.py)."""
+    return resolver_aguardando_erp(
+        request,
+        PecasOrdem.objects.filter(ordem__grupo_maquina='usinagem'),
+        pk,
+    )

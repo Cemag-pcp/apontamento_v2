@@ -23,7 +23,7 @@ from cadastro_almox.models import (
 )
 from core_almox.models import RegistroAcaoSolicitacaoAlmox
 from core.utils import notificar_acao_almox
-from core_almox.views import _chamar_innovaro_transferir
+from core_almox.views import _transferir_e_registrar
 
 from .forms import (
     SolicitacaoRequisicaoForm,
@@ -111,17 +111,8 @@ def criar_solicitacoes(request):
                         ).update(chave_innovaro='PROCESSANDO')
 
                     if claimed:
-                        chave, erro = _chamar_innovaro_transferir(solicitacao)
-                        if erro:
-                            solicitacao.rpa = erro
-                            solicitacao.chave_innovaro = None
-                            solicitacao.save(update_fields=["rpa", "chave_innovaro"])
-                        else:
-                            solicitacao.entregue_por = operador
-                            solicitacao.data_entrega = data_entrega
-                            solicitacao.chave_innovaro = str(chave) if chave else None
-                            solicitacao.save()
-                            notificar_acao_almox("entregar", "transferencia", solicitacao.id)
+                        # sem resposta do Innovaro vai pra fila de verificacao manual
+                        _transferir_e_registrar(solicitacao, operador, data_entrega)
 
                     return JsonResponse({"status": "sucesso", "operador": True})
                 except Http404:

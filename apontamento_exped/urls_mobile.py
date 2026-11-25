@@ -16,6 +16,7 @@ urlpatterns = [
     path('cargas/<int:carga_id>/bipagem/',api_mobile.BipagemCargaView.as_view(), name='bipagem_carga'),
     path('cargas/<int:carga_id>/bipagem/<int:pacote_id>/', api_mobile.DesfazerBipagemView.as_view(), name='desfazer_bipagem'),
     path('cargas/<int:carga_id>/fornecedores/', api_mobile.SalvarFornecedoresView.as_view(), name='salvar_fornecedores'),
+    path('cargas/<int:carga_id>/avancar-stage/', api_mobile.AvancarStageCargaView.as_view(), name='avancar_stage_carga'),
     path('cargas/<int:carga_id>/', api_mobile.ExcluirCargaView.as_view(), name='excluir_carga'),
     path('pacotes/<int:pacote_id>/fotos/', api_mobile.FotosPacoteView.as_view(), name='fotos_pacote'),
     path('pacotes/<int:pacote_id>/foto/', api_mobile.UploadFotoView.as_view(), name='upload_foto'),

@@ -4,6 +4,7 @@ from .views import (
     corte,
     estamparia,
     estanqueidade,
+    garantia,
     indicadores,
     montagem,
     pintura,
@@ -28,12 +29,17 @@ urlpatterns = [
     path('api/banhos-ezinger/', pintura.listar_analises_banho_ezinger, name='listar-banhos-ezinger'),
     path('api/banhos-ezinger/salvar/', pintura.salvar_analise_banho_ezinger, name='salvar-banhos-ezinger'),
     path('api/banhos-ezinger/registrar-adicao/', pintura.registrar_adicao_banho_ezinger, name='registrar-adicao-banhos-ezinger'),
+    path('api/registro-limpeza-pintura/', pintura.listar_registros_limpeza_pintura, name='listar-registro-limpeza-pintura'),
+    path('api/registro-limpeza-pintura/salvar/', pintura.salvar_registro_limpeza_pintura, name='salvar-registro-limpeza-pintura'),
+    path('api/registro-limpeza-pintura/pecas/', pintura.pecas_registro_limpeza_pintura, name='pecas-registro-limpeza-pintura'),
+    path('api/registro-limpeza-pintura/<int:id>/', pintura.detalhe_registro_limpeza_pintura, name='detalhe-registro-limpeza-pintura'),
 
     path('api/historico-pintura/<int:id>', pintura.get_historico_pintura, name='historico-pintura'),
     path('api/historico-causas-pintura/<int:id>', pintura.get_historico_causas_pintura, name='historico-causas-pintura'),
     path('api/imagens-causas-conformidades-pintura/<int:id>/<int:num_execucao>', pintura.get_imagens_causas_conformidades_pintura, name='historico-causas-pintura'),
 
     path('api/envio-inspecao-pintura/', pintura.envio_inspecao_pintura, name='envio-inspecao-pintura'),
+    path('api/rascunho-inspecao-pintura/<int:id>/', pintura.rascunho_inspecao_pintura, name='rascunho-inspecao-pintura'),
     path('api/envio-reinspecao-pintura/', pintura.envio_reinspecao_pintura, name='envio-reinspecao-pintura'),
 
     path('api/itens-inspecao-montagem/', montagem.get_itens_inspecao_montagem, name='itens-inspecao-montagem'),
@@ -45,6 +51,7 @@ urlpatterns = [
     path('api/itens-reinspecao-estamparia/', estamparia.get_itens_reinspecao_estamparia, name='itens-reinspecao-estamparia'),
 
     path('api/envio-inspecao-estamparia/', estamparia.inspecionar_estamparia, name='inspecionar_estamparia'),
+    path('api/rascunho-inspecao-estamparia/<int:id>/', estamparia.rascunho_inspecao_estamparia, name='rascunho_inspecao_estamparia'),
     path('api/envio-reinspecao-estamparia/', estamparia.envio_reinspecao_estamparia, name='envio_reinspecao_estamparia'),
 
     path('api/historico-estamparia/<int:id>', estamparia.get_historico_estamparia, name='historico-estamparia'),
@@ -75,6 +82,7 @@ urlpatterns = [
 
     path('api/envio-inspecao-montagem/', montagem.envio_inspecao_montagem, name='envio-inspecao-montagem'),
     path('api/envio-reinspecao-montagem/', montagem.envio_reinspecao_montagem, name='envio-reinspecao-montagem'),
+    path('api/rascunho-inspecao-montagem/<int:id>/', montagem.rascunho_inspecao_montagem, name='rascunho-inspecao-montagem'),
 
     path('api/itens-reinspecao-tubos-cilindros/', estanqueidade.get_itens_reinspecao_tubos_cilindros, name='itens-reinspecao-tubos-cilindros'),
     path('api/itens-inspecionados-tubos-cilindros/', estanqueidade.get_itens_inspecionados_tubos_cilindros, name='itens-inspecionados-tubos-cilindros'),
@@ -125,9 +133,17 @@ urlpatterns += [
     path('estanqueidade/conjuntos-inspecionados/', estanqueidade.cadastro_pecas_estanqueidade, name='conjuntos-inspecionados-estanqueidade'),
     path('serra-usinagem/', serra_usinagem.inspecao_serra_usinagem, name='inspecao-serra-usinagem'),
     path('corte/', corte.inspecao_corte, name='inspecao-corte'),
+    path('garantia/', garantia.inspecao_garantia, name='inspecao-garantia'),
+    path('api/garantia/itens/', garantia.api_itens_garantia, name='api-itens-garantia'),
+    path('api/garantia/detalhes/<int:item_id>/', garantia.api_detalhes_garantia, name='api-detalhes-garantia'),
+    path('api/garantia/inspecionar/', garantia.api_inspecionar_garantia, name='api-inspecionar-garantia'),
+    path('api/garantia/desfazer/', garantia.api_desfazer_garantia, name='api-desfazer-garantia'),
+    path('api/garantia/chamados-ploomes/', garantia.api_chamados_ploomes, name='api-chamados-ploomes-garantia'),
+    path('api/garantia/chamados-ploomes/<int:deal_id>/', garantia.api_detalhes_chamado_ploomes, name='api-detalhe-chamado-ploomes-garantia'),
     path('estamparia/', estamparia.inspecao_estamparia, name='inspecao-estamparia'),
     path('pintura/', pintura.inspecao_pintura, name='inspecao-pintura'),
     path('banhos-ezinger/', pintura.inspecao_banhos_ezinger, name='inspecao-banhos-ezinger'),
+    path('registro-limpeza-pintura/', pintura.registro_limpeza_pintura, name='registro-limpeza-pintura'),
     path('verificacao-funcional-pintura/', verificacao_funcional.verificacao_funcional_pintura, name='verificacao-funcional-pintura'),
     path('recebimento/', recebimento.inspecao_recebimento, name='inspecao-recebimento'),
     path('tubos-cilindros/', estanqueidade.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),

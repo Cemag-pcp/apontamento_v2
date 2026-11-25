@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import (
@@ -18,12 +18,77 @@ from ..models import (
     CausasNaoConformidade,
     ArquivoCausa,
 )
+from .rascunho import (
+    anexar_fotos_rascunho,
+    encerrar_rascunho,
+    ids_com_rascunho,
+    responder_rascunho,
+)
 from core.models import Profile, Maquina
 
 
 from datetime import datetime, timedelta
+import unicodedata
 from collections import defaultdict
 import json
+
+# Abas "A inspecionar" e "Reinspeção": sem nenhum filtro aplicado a lista
+# mostra so os registros dos ultimos DIAS_PADRAO_LISTA dias. Qualquer filtro
+# (data, maquina, pesquisa, inspetor) busca em todo o historico.
+DIAS_PADRAO_LISTA = 30
+
+# Checklist da inspeção/reinspeção de montagem: 3 grupos OK / Ñ OK, cada um
+# com as principais falhas (que são causas do cadastro, setor "montagem").
+# A causa é achada pelo nome sem diferenciar maiúsculas, acento e plural
+# ("Trincas" = "Trinca"). Causa ativa fora daqui (ex.: "Aspecto visual da
+# solda") sai do checklist, mas o histórico dela continua.
+# A migração inspecao/0060 cadastra as que não existiam.
+GRUPOS_CHECKLIST_MONTAGEM = [
+    ("Preparação, Montagem e Dimensional", [
+        "Folgas",
+        "Desalinhamentos",
+        "Falta de peças",
+    ]),
+    ("Descontinuidades e Defeitos de Fusão", [
+        "Falta de fusão",
+        "Trincas",
+        "Porosidade",
+        "Mordedura",
+        "Perfuração",
+    ]),
+    ("Acabamento e Aspecto Visual", [
+        "Respingo de solda",
+        "Falta de solda",
+        "Sobreposição",
+        "Cratera aberta",
+    ]),
+]
+
+
+def normalizar_nome_causa(nome):
+    """"Falta de Peças" -> "falta de peca": sem acento, minúsculo e sem o
+    "s" do plural, para casar nomes escritos de jeito um pouco diferente."""
+    texto = unicodedata.normalize("NFKD", str(nome or "")).encode("ascii", "ignore").decode()
+    palavras = texto.casefold().split()
+    return " ".join(p[:-1] if len(p) > 3 and p.endswith("s") else p for p in palavras)
+
+
+def _causas_checklist_montagem(causas):
+    """{"grupos": [{"nome", "causas": [{"id", "nome"}]}]} com o nome de
+    exibição de cada falha. Falha sem causa no cadastro fica de fora."""
+    por_nome = {}
+    for causa in sorted(causas, key=lambda c: c.id):
+        por_nome.setdefault(normalizar_nome_causa(causa.nome), causa)
+    grupos = []
+    for nome_grupo, falhas in GRUPOS_CHECKLIST_MONTAGEM:
+        itens = [
+            {"id": por_nome[normalizar_nome_causa(falha)].id, "nome": falha}
+            for falha in falhas
+            if normalizar_nome_causa(falha) in por_nome
+        ]
+        if itens:
+            grupos.append({"nome": nome_grupo, "causas": itens})
+    return {"grupos": grupos}
 
 
 def inspecao_montagem(request):
@@ -31,7 +96,7 @@ def inspecao_montagem(request):
         tipo_acesso="inspetor", permissoes__nome="inspecao/montagem"
     )
 
-    causas = Causas.objects.filter(setor="montagem")
+    causas = Causas.objects.filter(setor="montagem", excluida=False)
 
     maquinas = list(
         Maquina.objects.filter(tipo="maquina", setor_id__nome="montagem").values_list(
@@ -62,6 +127,8 @@ def inspecao_montagem(request):
             "inspetor_logado": inspetor_logado,
             "inspetores": lista_inspetores,
             "causas": list_causas,
+            # checklist em 3 grupos (inspeção e reinspeção)
+            "causas_json": json.dumps(_causas_checklist_montagem(causas), ensure_ascii=False),
             "maquinas": maquinas,
         },
     )
@@ -168,6 +235,12 @@ def get_itens_inspecao_montagem(request):
 
     quantidade_total = datas.count()  # Total de itens sem filtro
 
+    limitado_periodo_padrao = not (maquinas_filtradas or data_inicio or data_fim or pesquisa_filtrada)
+    if limitado_periodo_padrao:
+        datas = datas.filter(
+            data_inspecao__gte=timezone.now() - timedelta(days=DIAS_PADRAO_LISTA)
+        )
+
     if maquinas_filtradas:
         datas = datas.filter(
             pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas
@@ -201,6 +274,9 @@ def get_itens_inspecao_montagem(request):
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    # Inspeções com "Salvar parcial" no servidor (selo "Parcial" no card)
+    com_rascunho = ids_com_rascunho([data.id for data in pagina_obj])
+
     dados = []
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
@@ -211,6 +287,7 @@ def get_itens_inspecao_montagem(request):
 
         item = {
             "id": data.id,
+            "parcial": data.id in com_rascunho,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
             "data_carga": (
                 data.pecas_ordem_montagem.ordem.data_carga.strftime("%d/%m/%Y")
@@ -232,6 +309,7 @@ def get_itens_inspecao_montagem(request):
             "total_filtrado": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
+            "limitado_dias": DIAS_PADRAO_LISTA if limitado_periodo_padrao else None,
         },
         status=200,
     )
@@ -267,6 +345,14 @@ def get_itens_reinspecao_montagem(request):
 
     # Mantém a lógica original: traz tanto montagem quanto tanque
     query = Q(id__in=reinspecao_ids) & (Q(pecas_ordem_montagem__isnull=False) | Q(estanqueidade__isnull=False))
+
+    limitado_periodo_padrao = not (
+        maquinas_filtradas or inspetores_filtrados or data_inicio or data_fim or pesquisa_filtrada
+    )
+    if limitado_periodo_padrao:
+        query &= Q(
+            dadosexecucaoinspecao__data_execucao__gte=timezone.now() - timedelta(days=DIAS_PADRAO_LISTA)
+        )
 
     if maquinas_filtradas:
         query &= Q(pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas)
@@ -393,6 +479,7 @@ def get_itens_reinspecao_montagem(request):
             "total_filtrado": paginador.count,
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
+            "limitado_dias": DIAS_PADRAO_LISTA if limitado_periodo_padrao else None,
         },
         status=200,
     )
@@ -502,12 +589,22 @@ def get_itens_inspecionados_montagem(request):
                 dadosexecucaoinspecao__num_execucao=0,
             )
 
+    # Filtro "Reinspecionadas": so as que passaram pela reinspecao de fato -
+    # concluida e com execucao de reinspecao (num_execucao > 0). Fica de fora a
+    # reinspecao fechada automaticamente quando a peca vai pra sucata.
+    if request.GET.get("reinspecionadas") == "1":
+        datas = datas.filter(
+            id__in=Reinspecao.objects.filter(reinspecionado=True).values("inspecao")
+        ).filter(
+            id__in=DadosExecucaoInspecao.objects.filter(num_execucao__gt=0).values("inspecao")
+        )
+
     datas = datas.select_related(
         "pecas_ordem_montagem",
         "pecas_ordem_montagem__ordem",
         "pecas_ordem_montagem__ordem__maquina",
         "pecas_ordem_montagem__operador",
-    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    ).order_by("-ultima_data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -517,9 +614,12 @@ def get_itens_inspecionados_montagem(request):
         inspecao__in=pagina_obj
     ).select_related(
         "inspecao", "inspetor__user", "inspecao__pecas_ordem_montagem__ordem__maquina"
-    )
+    ).order_by("data_execucao")
 
-    # Cria um dicionário para mapear inspecao_id para seus dados de execução
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução.
+    # Itera em ordem crescente de data_execucao e vai sobrescrevendo, entao
+    # a ultima escrita por inspecao_id e sempre a execucao mais recente (ex:
+    # a reinspecao, quando existir, prevalece sobre a inspecao original).
     dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
 
     dados = []
@@ -527,9 +627,7 @@ def get_itens_inspecionados_montagem(request):
         de = dados_execucao_dict.get(data.id)
 
         if de:
-            data_ajustada = DadosExecucaoInspecao.objects.filter(
-                inspecao=data
-            ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+            data_ajustada = de.data_execucao - timedelta(hours=3)
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
 
             item = {
@@ -547,6 +645,8 @@ def get_itens_inspecionados_montagem(request):
                 "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
+                "conformidade": de.conformidade,
+                "nao_conformidade": de.nao_conformidade,
             }
 
             dados.append(item)
@@ -630,6 +730,36 @@ def get_historico_causas_montagem(request, id):
     return JsonResponse({"causas": causas_list}, status=200)
 
 
+def _erro_foto_obrigatoria_montagem(request, prefixo_causas, prefixo_quantidade, prefixo_imagens, prefixo_fotos_rascunho=None):
+    """Toda nao conformidade da montagem exige foto: cada causa enviada
+    precisa de ao menos uma imagem por unidade que falhou (a tela agrega as
+    unidades por causa). Fotos ja salvas no "Salvar parcial"
+    (prefixo_fotos_rascunho) contam. Devolve a mensagem de erro ou None."""
+    try:
+        total = int(request.POST.get("quantidade-total-causas") or 0)
+    except ValueError:
+        total = 0
+
+    sem_foto = []
+    for i in range(1, total + 1):
+        try:
+            quantidade = int(request.POST.get(f"{prefixo_quantidade}{i}") or 0)
+        except ValueError:
+            quantidade = 0
+        fotos = len(request.FILES.getlist(f"{prefixo_imagens}{i}"))
+        if prefixo_fotos_rascunho:
+            fotos += len(request.POST.getlist(f"{prefixo_fotos_rascunho}{i}"))
+        if fotos < max(quantidade, 1):
+            nomes = Causas.objects.filter(
+                id__in=request.POST.getlist(f"{prefixo_causas}{i}")
+            ).values_list("nome", flat=True)
+            sem_foto.append(", ".join(nomes) or f"causa {i}")
+
+    if sem_foto:
+        return "Foto obrigatória em toda não conformidade. Faltando em: " + "; ".join(sem_foto) + "."
+    return None
+
+
 def envio_inspecao_montagem(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
@@ -638,6 +768,11 @@ def envio_inspecao_montagem(request):
 
     if DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).exists():
         return JsonResponse({"error": "Item já inspecionado."}, status=400)
+
+    # fotos_rascunho_N = fotos ja salvas no "Salvar parcial"
+    erro_foto = _erro_foto_obrigatoria_montagem(request, "causas_", "quantidade_", "imagens_", "fotos_rascunho_")
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():
@@ -696,15 +831,35 @@ def envio_inspecao_montagem(request):
                             arquivo=imagem,
                         )
 
+                    # Fotos ja salvas no "Salvar parcial": reaproveita o arquivo
+                    anexar_fotos_rascunho(
+                        inspecao, causa_nao_conformidade, request.POST.getlist(f"fotos_rascunho_{i}")
+                    )
+
+            encerrar_rascunho(inspecao, dados_execucao)
+
         return JsonResponse({"success": True})
 
     except Exception as e:
         return JsonResponse({"error": "Erro"}, status=400)
 
 
+def rascunho_inspecao_montagem(request, id):
+    """"Salvar parcial" da inspeção de montagem, guardado no servidor pra
+    continuar de qualquer aparelho."""
+    inspecao = get_object_or_404(Inspecao, pk=id, pecas_ordem_montagem__isnull=False)
+    return responder_rascunho(request, inspecao)
+
+
 def envio_reinspecao_montagem(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    erro_foto = _erro_foto_obrigatoria_montagem(
+        request, "causas_reinspecao_", "quantidade_reinspecao_", "imagens_reinspecao_"
+    )
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():
@@ -757,8 +912,11 @@ def envio_reinspecao_montagem(request):
                             causa_nao_conformidade=causa_nao_conformidade,
                             arquivo=imagem,
                         )
-            else:
-                reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+
+            # A reinspecao e a ultima etapa: encerra a fila mesmo se ainda
+            # houver nao conformidade residual, nao devolve pra reinspecionar de novo.
+            reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+            if reinspecao:
                 reinspecao.reinspecionado = True
                 reinspecao.save()
 

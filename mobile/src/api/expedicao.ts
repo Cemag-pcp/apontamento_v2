@@ -90,6 +90,10 @@ export function salvarFornecedores(token: string, cargaId: number, entradas: For
   });
 }
 
+export function avancarStageCarga(token: string, cargaId: number) {
+  return apiFetch<AvancarStageResponse>(`/cargas/${cargaId}/avancar-stage/`, { method: 'POST', token });
+}
+
 export function excluirCarga(token: string, cargaId: number) {
   return apiFetch<ExcluirCargaResponse>(`/cargas/${cargaId}/`, { method: 'DELETE', token });
 }

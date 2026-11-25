@@ -1,0 +1,318 @@
+<div class="modal fade" id="modal-cadastro-inventario" tabindex="-1" aria-labelledby="titulo-modal-cadastro-inventario" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="titulo-modal-cadastro-inventario"><i class="bi bi-person-plus"></i> Novo cadastro</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="form-cadastro-inventario" novalidate>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="cadastro-setor" class="form-label mb-1">Setor <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="cadastro-setor" maxlength="100" list="lista-setores-inventario" placeholder="Ex.: Montagem" autocomplete="off" required>
+                        <datalist id="lista-setores-inventario"></datalist>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cadastro-celula" class="form-label mb-1">Célula <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="cadastro-celula" maxlength="100" list="lista-celulas-inventario" placeholder="Ex.: Chassi" autocomplete="off" required>
+                        <datalist id="lista-celulas-inventario"></datalist>
+                    </div>
+                    <div class="mb-2">
+                        <label for="cadastro-responsavel" class="form-label mb-1">Responsável <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="cadastro-responsavel" maxlength="150" list="lista-responsaveis-inventario" placeholder="Ex.: 3123 - José" autocomplete="off" required>
+                        <datalist id="lista-responsaveis-inventario"></datalist>
+                    </div>
+                    <div class="form-text">A mesma combinação de setor + célula + responsável não pode se repetir neste inventário. Se o setor + célula estiver pendente, o responsável é preenchido nele.</div>
+                    <div id="erro-modal-cadastro" class="alert alert-danger py-2 small mt-3 mb-0 d-none" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-outline-primary botao-salvar-cadastro" data-continuar="1" title="Salva e mantém setor e célula para lançar outro responsável">
+                        <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true"></span>
+                        Salvar e adicionar outro
+                    </button>
+                    <button type="submit" class="btn btn-primary botao-salvar-cadastro">
+                        <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true"></span>
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span class="fw-semibold">
+            Cadastrados <span class="badge bg-secondary" id="total-cadastros-inventario">0</span>
+            <span class="badge bg-warning text-dark d-none" id="total-pendentes-inventario"></span>
+        </span>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="so-pendentes-inventario">
+                <label class="form-check-label small" for="so-pendentes-inventario">Só pendentes</label>
+            </div>
+            <input type="search" class="form-control form-control-sm" id="busca-cadastro-inventario" placeholder="Buscar setor, célula ou responsável" style="max-width: 280px;">
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal-cadastro-inventario">
+                <i class="bi bi-plus-lg"></i> Novo cadastro
+            </button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Setor</th>
+                    <th>Célula</th>
+                    <th>Responsável</th>
+                    <th class="d-none d-md-table-cell">Cadastrado por</th>
+                    <th class="text-end" style="width: 1%;"></th>
+                </tr>
+            </thead>
+            <tbody id="tabela-cadastros-inventario"></tbody>
+        </table>
+    </div>
+</div>
+
+{{ cadastros|json_script:"dados-cadastros-inventario" }}
+<script>
+(() => {
+    const URL_CRIAR = "{% url 'inventario:criar_cadastro' inventario.id %}";
+    const URL_EXCLUIR = "{% url 'inventario:excluir_cadastro' 0 %}";
+    const URL_RESPONSAVEL = "{% url 'inventario:definir_responsavel' 0 %}";
+    const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+    let cadastros = JSON.parse(document.getElementById("dados-cadastros-inventario").textContent);
+
+    const form = document.getElementById("form-cadastro-inventario");
+    const campos = {
+        setor: document.getElementById("cadastro-setor"),
+        celula: document.getElementById("cadastro-celula"),
+        responsavel: document.getElementById("cadastro-responsavel"),
+    };
+    const elementoModal = document.getElementById("modal-cadastro-inventario");
+    // o bootstrap.js do base.html carrega depois deste script: pega na hora de usar
+    const modal = () => bootstrap.Modal.getOrCreateInstance(elementoModal);
+    const botoesSalvar = [...form.querySelectorAll(".botao-salvar-cadastro")];
+    const corpo = document.getElementById("tabela-cadastros-inventario");
+    const busca = document.getElementById("busca-cadastro-inventario");
+    const soPendentes = document.getElementById("so-pendentes-inventario");
+
+    const escapar = (texto) => {
+        const div = document.createElement("div");
+        div.textContent = texto ?? "";
+        return div.innerHTML;
+    };
+    const normalizar = (texto) => (texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const ordenar = (a, b) =>
+        a.setor.localeCompare(b.setor, "pt-BR", { sensitivity: "base" }) ||
+        a.celula.localeCompare(b.celula, "pt-BR", { sensitivity: "base" }) ||
+        a.responsavel.localeCompare(b.responsavel, "pt-BR", { sensitivity: "base" });
+
+    // sugestões com o que já foi digitado neste inventário (evita "Montagem" e "montagem ")
+    function atualizarSugestoes() {
+        [["setor", "lista-setores-inventario"], ["celula", "lista-celulas-inventario"], ["responsavel", "lista-responsaveis-inventario"]]
+            .forEach(([campo, idLista]) => {
+                const valores = [...new Set(cadastros.map((c) => c[campo]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+                document.getElementById(idLista).innerHTML = valores.map((v) => `<option value="${escapar(v)}"></option>`).join("");
+            });
+    }
+
+    function renderizar() {
+        const termo = normalizar(busca.value.trim());
+        const visiveis = cadastros.filter((c) =>
+            (!soPendentes.checked || c.pendente) &&
+            (!termo || normalizar(`${c.setor} ${c.celula} ${c.responsavel}`).includes(termo)));
+        document.getElementById("total-cadastros-inventario").textContent = cadastros.length;
+        const pendentes = cadastros.filter((c) => c.pendente).length;
+        const seloPendentes = document.getElementById("total-pendentes-inventario");
+        seloPendentes.textContent = `${pendentes} pendente${pendentes === 1 ? "" : "s"}`;
+        seloPendentes.classList.toggle("d-none", pendentes === 0);
+
+        if (visiveis.length === 0) {
+            const mensagem = !cadastros.length ? "Nenhum cadastro ainda."
+                : soPendentes.checked && !termo ? "Nenhum setor + célula pendente."
+                : "Nenhum cadastro encontrado na busca.";
+            corpo.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">${mensagem}</td></tr>`;
+            return;
+        }
+        corpo.innerHTML = visiveis.map((c) => `
+            <tr class="${c.pendente ? "table-warning" : ""}">
+                <td>${escapar(c.setor)}</td>
+                <td>${escapar(c.celula)}</td>
+                <td>${c.pendente ? '<span class="badge bg-warning text-dark">Pendente</span>' : escapar(c.responsavel)}</td>
+                <td class="d-none d-md-table-cell small text-muted">${escapar(c.criado_por)}${c.criado_por ? " · " : ""}${escapar(c.criado_em)}</td>
+                <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm ${c.pendente ? "btn-warning" : "btn-outline-secondary"} definir-responsavel" data-id="${c.id}" title="${c.pendente ? "Definir responsável" : "Trocar responsável"}">
+                        <i class="bi ${c.pendente ? "bi-person-plus" : "bi-pencil"}"></i>${c.pendente ? " Definir" : ""}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger excluir-cadastro" data-id="${c.id}" title="Excluir">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>`).join("");
+    }
+
+    function substituirOuIncluir(cadastro) {
+        const posicao = cadastros.findIndex((c) => c.id === cadastro.id);
+        if (posicao >= 0) cadastros[posicao] = cadastro;
+        else cadastros.push(cadastro);
+        cadastros.sort(ordenar);
+        atualizarSugestoes();
+        renderizar();
+    }
+
+    Object.values(campos).forEach((campo) => campo.addEventListener("input", () => campo.classList.remove("is-invalid")));
+    busca.addEventListener("input", renderizar);
+    soPendentes.addEventListener("change", renderizar);
+
+    const erroModal = document.getElementById("erro-modal-cadastro");
+    const mostrarErroModal = (mensagem) => {
+        erroModal.textContent = mensagem || "";
+        erroModal.classList.toggle("d-none", !mensagem);
+    };
+    form.addEventListener("input", () => mostrarErroModal(""));
+
+    // abre sempre limpo
+    elementoModal.addEventListener("show.bs.modal", () => {
+        form.reset();
+        mostrarErroModal("");
+        Object.values(campos).forEach((campo) => campo.classList.remove("is-invalid"));
+    });
+    elementoModal.addEventListener("shown.bs.modal", () => campos.setor.focus());
+
+    const carregando = (ativo, clicado) => botoesSalvar.forEach((b) => {
+        b.disabled = ativo;
+        b.querySelector(".spinner-border").classList.toggle("d-none", !(ativo && b === clicado));
+    });
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        // Enter no campo = "Salvar"
+        const clicado = event.submitter || botoesSalvar[botoesSalvar.length - 1];
+        const continuar = clicado.dataset.continuar === "1";
+        const valores = Object.fromEntries(Object.entries(campos).map(([chave, campo]) => [chave, campo.value.replace(/\s+/g, " ").trim()]));
+        const vazio = Object.entries(valores).find(([, valor]) => !valor);
+        if (vazio) {
+            campos[vazio[0]].classList.add("is-invalid");
+            campos[vazio[0]].focus();
+            return;
+        }
+        // aviso imediato; o servidor confere de novo
+        const repetido = cadastros.some((c) =>
+            ["setor", "celula", "responsavel"].every((k) => c[k].toLocaleLowerCase("pt-BR") === valores[k].toLocaleLowerCase("pt-BR")));
+        if (repetido) {
+            mostrarErroModal("Essa combinação de setor + célula + responsável já existe neste inventário.");
+            return;
+        }
+
+        carregando(true, clicado);
+        try {
+            const resposta = await fetch(URL_CRIAR, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+                body: JSON.stringify(valores),
+            });
+            const dados = await resposta.json().catch(() => ({}));
+            if (!resposta.ok) throw new Error(dados.error || "Não foi possível salvar o cadastro.");
+
+            substituirOuIncluir(dados.cadastro);
+            if (continuar) {
+                // mantém setor e célula para lançar vários responsáveis seguidos
+                campos.responsavel.value = "";
+                campos.responsavel.focus();
+            } else {
+                modal().hide();
+            }
+            const titulo = dados.preencheu_pendente ? "Responsável definido no pendente" : "Cadastro adicionado";
+            Swal.fire({ toast: true, position: "bottom-end", icon: "success", title: titulo, showConfirmButton: false, timer: 2000 });
+        } catch (erro) {
+            mostrarErroModal(erro.message);
+        } finally {
+            carregando(false);
+        }
+    });
+
+    corpo.addEventListener("click", async (event) => {
+        const botaoResponsavel = event.target.closest(".definir-responsavel");
+        if (!botaoResponsavel) return;
+        const cadastro = cadastros.find((c) => String(c.id) === botaoResponsavel.dataset.id);
+        if (!cadastro) return;
+
+        const resultado = await Swal.fire({
+            title: cadastro.pendente ? "Definir responsável" : "Trocar responsável",
+            text: `${cadastro.setor} / ${cadastro.celula}`,
+            input: "text",
+            inputValue: cadastro.responsavel,
+            inputPlaceholder: "Ex.: 3123 - José",
+            inputAttributes: { maxlength: "150", list: "lista-responsaveis-inventario", autocomplete: "off" },
+            showCancelButton: true,
+            confirmButtonText: "Salvar",
+            cancelButtonText: "Cancelar",
+            showLoaderOnConfirm: true,
+            allowOutsideClick: () => !Swal.isLoading(),
+            preConfirm: async (valor) => {
+                const responsavel = (valor || "").replace(/\s+/g, " ").trim();
+                if (!responsavel) {
+                    Swal.showValidationMessage("Informe o responsável.");
+                    return false;
+                }
+                try {
+                    const resposta = await fetch(URL_RESPONSAVEL.replace("/0/", `/${cadastro.id}/`), {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+                        body: JSON.stringify({ responsavel }),
+                    });
+                    const dados = await resposta.json().catch(() => ({}));
+                    if (!resposta.ok) throw new Error(dados.error || "Não foi possível salvar o responsável.");
+                    return dados.cadastro;
+                } catch (erro) {
+                    Swal.showValidationMessage(erro.message);
+                    return false;
+                }
+            },
+        });
+        if (resultado.isConfirmed && resultado.value) {
+            substituirOuIncluir(resultado.value);
+            Swal.fire({ toast: true, position: "bottom-end", icon: "success", title: "Responsável salvo", showConfirmButton: false, timer: 2000 });
+        }
+    });
+
+    corpo.addEventListener("click", async (event) => {
+        const botaoExcluir = event.target.closest(".excluir-cadastro");
+        if (!botaoExcluir) return;
+        const cadastro = cadastros.find((c) => String(c.id) === botaoExcluir.dataset.id);
+        if (!cadastro) return;
+
+        const confirmacao = await Swal.fire({
+            icon: "question",
+            title: "Excluir cadastro?",
+            text: `${cadastro.setor} / ${cadastro.celula} / ${cadastro.responsavel}`,
+            showCancelButton: true,
+            confirmButtonText: "Excluir",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: "#dc3545",
+        });
+        if (!confirmacao.isConfirmed) return;
+
+        botaoExcluir.disabled = true;
+        try {
+            const resposta = await fetch(URL_EXCLUIR.replace("/0/", `/${cadastro.id}/`), {
+                method: "POST",
+                headers: { "X-CSRFToken": csrf() },
+            });
+            const dados = await resposta.json().catch(() => ({}));
+            if (!resposta.ok) throw new Error(dados.error || "Não foi possível excluir o cadastro.");
+            cadastros = cadastros.filter((c) => c.id !== cadastro.id);
+            atualizarSugestoes();
+            renderizar();
+        } catch (erro) {
+            botaoExcluir.disabled = false;
+            Swal.fire({ icon: "error", title: "Erro", text: erro.message });
+        }
+    });
+
+    atualizarSugestoes();
+    renderizar();
+})();
+</script>

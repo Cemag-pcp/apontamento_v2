@@ -8,9 +8,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../api/expedicao';
+import { ApiError } from '../api/client';
 import { comCache } from '../offline/cache';
 import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
-import { ApiError } from '../api/client';
 import type { Pacote, PacotesDaCargaResponse, RequisitosAvanco, StageCarga } from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Pacotes'>;

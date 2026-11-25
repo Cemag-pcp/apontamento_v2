@@ -23,6 +23,21 @@ from inspecao.models import Inspecao, DadosExecucaoInspecao
 from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
 from core.utils import notificar_ordem
+from core.permissoes import tem_subacesso
+from core.erp_apontamento import (
+    MENSAGEM_AGUARDANDO_ERP,
+    MENSAGEM_ITEM_BLOQUEADO,
+    TIMEOUT_ERP_APONTAMENTO,
+    marcar_aguardando_confirmacao_erp,
+    resolver_aguardando_erp,
+    resposta_aguardando_erp,
+    resposta_incerta,
+    resposta_item_bloqueado,
+)
+
+# Sub-acessos da tela /estamparia/ (ver core/permissoes.py e a migracao 0021)
+SUBACESSO_PLANEJAR = 'estamparia#planejar'
+SUBACESSO_RETIRAR_PRIORIDADE = 'estamparia#retirar-prioridade'
 
 from datetime import date, datetime, timedelta
 import os
@@ -90,6 +105,9 @@ def _marcar_apontamento_manual(item, user):
 
 
 def _apontar_item_via_api_erp_estamparia(item, user):
+    if item.aguardando_confirmacao_erp:
+        raise IntegracaoERPError(MENSAGEM_ITEM_BLOQUEADO, http_status=409)
+
     if (item.qtd_morta or 0) > 0:
         msg_qtd_morta = (
             'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
@@ -133,16 +151,25 @@ def _apontar_item_via_api_erp_estamparia(item, user):
                 "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=(5, 20),
+                timeout=TIMEOUT_ERP_APONTAMENTO,
             )
         else:
             response_integracao = requests.post(
                 "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=(5, 20),
+                timeout=TIMEOUT_ERP_APONTAMENTO,
             )
     except requests.RequestException as exc:
+        if resposta_incerta(exc):
+            # pode ter entrado no ERP: bloqueia até alguém conferir
+            marcar_aguardando_confirmacao_erp(item, user, exc)
+            raise IntegracaoERPError(
+                MENSAGEM_AGUARDANDO_ERP,
+                http_status=504,
+                description=MENSAGEM_AGUARDANDO_ERP,
+                payload_enviado=payload_integracao,
+            )
         raise IntegracaoERPError(
             f'Falha de comunicação com API ERP: {exc}',
             http_status=502,
@@ -273,7 +300,8 @@ def planejamento(request):
                                                                     'operadores':operadores,
                                                                     'motivos_maquina_parada':motivos_maquina_parada,
                                                                     'motivos_exclusao': motivos_exclusao,
-                                                                    'setor_estamparia_id': setor_estamparia.id if setor_estamparia else ''})
+                                                                    'setor_estamparia_id': setor_estamparia.id if setor_estamparia else '',
+                                                                    'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
 
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
@@ -452,6 +480,10 @@ def get_ordens_criadas(request):
         'has_next': ordens_page.has_next(),
     })
 
+def _pode_retirar_prioridade(user):
+    return tem_subacesso(user, SUBACESSO_RETIRAR_PRIORIDADE)
+
+
 @require_GET
 def get_painel_prioridades(request):
     usuario_tipo = (
@@ -488,7 +520,11 @@ def get_painel_prioridades(request):
             'qtd_planejada': primeira_peca.qtd_planejada if primeira_peca else 0,
         })
 
-    return JsonResponse({'ordens': data, 'usuario_tipo_acesso': usuario_tipo})
+    return JsonResponse({
+        'ordens': data,
+        'usuario_tipo_acesso': usuario_tipo,
+        'pode_retirar': _pode_retirar_prioridade(request.user),
+    })
 
 
 @require_GET
@@ -549,12 +585,8 @@ def editar_ordem_prioridade(request):
 
 @require_POST
 def retirar_ordem_prioridade(request):
-    usuario_tipo = (
-        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
-        if request.user.is_authenticated else None
-    )
-    if usuario_tipo != 'pcp':
-        return JsonResponse({'error': 'Apenas usuarios PCP podem retirar prioridade.'}, status=403)
+    if not _pode_retirar_prioridade(request.user):
+        return JsonResponse({'error': 'Voce nao tem permissao para retirar prioridade.'}, status=403)
 
     try:
         body = json.loads(request.body)
@@ -1059,6 +1091,9 @@ def _validar_e_montar_ordem(item, index=None):
 @csrf_exempt
 def planejar_ordem_estamparia(request):
 
+    if request.method == 'POST' and not tem_subacesso(request.user, SUBACESSO_PLANEJAR):
+        return JsonResponse({'error': 'Você não tem permissão para planejar ordens.'}, status=403)
+
     if request.method == 'POST':
 
         content_type = request.content_type or ''
@@ -1243,6 +1278,8 @@ def api_erp_apontamentos_estamparia(request):
         queryset = queryset.filter(apontado=True)
     elif filtros['apontado'] == 'false':
         queryset = queryset.filter(apontado=False)
+    elif filtros['apontado'] == 'aguardando':
+        queryset = queryset.filter(aguardando_confirmacao_erp=True)
 
     data_apontamento_inicio = parse_date(filtros['data_apontamento_inicio']) if filtros['data_apontamento_inicio'] else None
     data_apontamento_fim = parse_date(filtros['data_apontamento_fim']) if filtros['data_apontamento_fim'] else None
@@ -1284,6 +1321,7 @@ def api_erp_apontamentos_estamparia(request):
             'tipo_apontamento': item.tipo_apontamento or '',
             'chave_apontamento': item.chave_apontamento or '',
             'erro_apontamento': item.erro_apontamento or '',
+            'aguardando_confirmacao_erp': item.aguardando_confirmacao_erp,
             'resp_apontamento': nome_resp,
             'resp_apontamento_username': resp.username if resp else '',
             'data_producao': localtime(item.data).strftime('%d/%m/%Y %H:%M') if item.data else '',
@@ -1365,6 +1403,12 @@ def api_erp_apontar_item_estamparia(request, pk):
                 status=409
             )
 
+        # a ordem é apontada uma vez só: outro item dela aguardando confirmação também bloqueia
+        if item.aguardando_confirmacao_erp or PecasOrdem.objects.filter(
+            ordem_id=item.ordem_id, aguardando_confirmacao_erp=True
+        ).exists():
+            return resposta_item_bloqueado()
+
         if tipo_apontamento == 'api':
             data_producao = localtime(item.data) if item.data else localtime(now())
             payload_integracao = {
@@ -1412,16 +1456,19 @@ def api_erp_apontar_item_estamparia(request, pk):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
             except requests.RequestException as exc:
+                if resposta_incerta(exc):
+                    marcar_aguardando_confirmacao_erp(item, request.user, exc)
+                    return resposta_aguardando_erp(payload_integracao)
                 return JsonResponse(
                     {
                         'status': 'error',
@@ -1577,7 +1624,9 @@ def api_ordens_finalizadas(request):
                 m.nome AS maquina,
                 p.codigo AS peca,
                 p.descricao AS descricao,
-                ope.qtd_boa - ope.qtd_morta AS total_produzido,
+                -- qtd_boa já é só as boas (a tela pede "Qt. peças boas" e
+                -- "Qt. mortas" separadas): não descontar as mortas de novo
+                ope.qtd_boa AS total_produzido,
                 TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 CONCAT(f.matricula, ' - ', f.nome) AS operador,
@@ -1941,3 +1990,14 @@ def dashboard_producao_inspecao(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+
+
+@login_required
+@require_POST
+def api_erp_resolver_aguardando_estamparia(request, pk):
+    """Confirmar que entrou no ERP / liberar para reenviar (ver core/erp_apontamento.py)."""
+    return resolver_aguardando_erp(
+        request,
+        PecasOrdem.objects.filter(ordem__grupo_maquina='estamparia'),
+        pk,
+    )

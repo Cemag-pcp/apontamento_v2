@@ -161,6 +161,11 @@ function formatarSituacao(material) {
     if (entregaAtrasada) {
         badges.push('<span class="compras-badge urgente"><i class="fas fa-calendar-xmark"></i> Entrega atrasada</span>');
     }
+    // Queda abaixo do minimo antes de qualquer compra nova chegar, ja coberta
+    // pelos pedidos feitos (nao entra na data de compra, so avisa)
+    if (material.data_abaixo_minimo_coberto) {
+        badges.push(`<span class="compras-badge curto" title="Os pedidos já feitos repõem o estoque logo depois; nenhuma compra nova chegaria antes dessa data."><i class="fas fa-circle-exclamation"></i> Abaixo do mín. em ${material.data_abaixo_minimo_coberto.slice(0, 5)}</span>`);
+    }
     return badges.join('');
 }
 

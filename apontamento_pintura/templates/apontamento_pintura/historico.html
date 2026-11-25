@@ -48,12 +48,20 @@
     <div class="hist-filters">
         <div class="row g-2 align-items-end">
             <div class="col-6 col-md-2">
-                <label class="form-label form-label-sm mb-1">Data início</label>
+                <label class="form-label form-label-sm mb-1">Pintura de</label>
                 <input type="date" class="form-control form-control-sm" id="f-data-inicio">
             </div>
             <div class="col-6 col-md-2">
-                <label class="form-label form-label-sm mb-1">Data fim</label>
+                <label class="form-label form-label-sm mb-1">Pintura até</label>
                 <input type="date" class="form-control form-control-sm" id="f-data-fim">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Carga de</label>
+                <input type="date" class="form-control form-control-sm" id="f-carga-inicio">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Carga até</label>
+                <input type="date" class="form-control form-control-sm" id="f-carga-fim">
             </div>
             <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm mb-1">Tipo</label>
@@ -171,7 +179,9 @@ function getParams(pagina) {
     return {
         data_inicio: document.getElementById('f-data-inicio').value,
         data_fim:    document.getElementById('f-data-fim').value,
-        tipo:        document.getElementById('f-tipo').value,
+        carga_inicio: document.getElementById('f-carga-inicio').value,
+        carga_fim:    document.getElementById('f-carga-fim').value,
+        tipo:       document.getElementById('f-tipo').value,
         operador:    document.getElementById('f-operador').value,
         cambao:      document.getElementById('f-cambao').value,
         status:      document.getElementById('f-status').value,
@@ -337,6 +347,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     buscar(1);
 
+    // Ao filtrar pela carga, tira o filtro de pintura que ainda esta no padrao
+    // (hoje) - a carga e de outro dia e o cruzamento quase sempre vem vazio.
+    ['f-carga-inicio', 'f-carga-fim'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+            const ini = document.getElementById('f-data-inicio');
+            const fim = document.getElementById('f-data-fim');
+            if (ini.value === hoje && fim.value === hoje) {
+                ini.value = '';
+                fim.value = '';
+            }
+        });
+    });
+
     document.getElementById('btn-buscar').addEventListener('click', () => buscar(1));
     document.getElementById('f-pesquisar').addEventListener('keydown', e => {
         if (e.key === 'Enter') buscar(1);
@@ -345,6 +368,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-limpar-filtros').addEventListener('click', () => {
         document.getElementById('f-data-inicio').value = '';
         document.getElementById('f-data-fim').value = '';
+        document.getElementById('f-carga-inicio').value = '';
+        document.getElementById('f-carga-fim').value = '';
         document.getElementById('f-tipo').value = '';
         document.getElementById('f-operador').value = '';
         document.getElementById('f-cambao').value = '';

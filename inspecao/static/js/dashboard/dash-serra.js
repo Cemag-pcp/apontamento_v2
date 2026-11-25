@@ -33,10 +33,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const indiceGlobal = totalInsp > 0
             ? (totalNC / totalInsp * 100).toFixed(2).replace('.', ',')
             : '0,00';
+        const pctNC = totalInsp > 0
+            ? (totalNC / totalInsp * 100).toFixed(1).replace('.', ',')
+            : '0,0';
 
         document.getElementById('kpi-pecas-produzidas').textContent    = totalProd.toLocaleString('pt-BR');
         document.getElementById('kpi-pecas-inspecionadas').textContent = totalInsp.toLocaleString('pt-BR');
         document.getElementById('kpi-pct-inspecao').textContent        = pctInsp + '%';
+        document.getElementById('kpi-pct-nc').textContent              = pctNC + '%';
         document.getElementById('kpi-nao-conformidade').textContent    = totalNC.toLocaleString('pt-BR');
         document.getElementById('kpi-indice-global').textContent       = indiceGlobal + '%';
     }
@@ -79,12 +83,15 @@ document.addEventListener('DOMContentLoaded', function() {
             tabela.innerHTML = '';
 
             if (data.length === 0) {
-                tabela.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                tabela.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
                 atualizarKPIs(0, 0, 0);
                 return;
             }
 
             data.forEach(item => {
+                const insp = Number(item["N° de inspeções"]) || 0;
+                const nc = Number(item["N° de não conformidades"]) || 0;
+                const pctNC = insp > 0 ? ((nc / insp) * 100).toFixed(2).replace('.', ',') + '%' : '0,00%';
                 tabela.insertAdjacentHTML('beforeend', `
                     <tr>
                         <td>${formatDateBr(item.Data)}</td>
@@ -92,6 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${item["N° de inspeções"]}</td>
                         <td>${item["N° de não conformidades"]}</td>
                         <td>${item["% de inspeção"]}</td>
+                        <td>${pctNC}</td>
                     </tr>
                 `);
             });

@@ -120,13 +120,17 @@ function buscarItensReinspecao(pagina) {
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
-        if (params.size > 1) {
+        // Sem filtro o servidor devolve so os ultimos N dias (limitado_dias).
+        // Nesse caso esconde o total geral de pendentes: ele conta tambem as
+        // reinspecoes antigas, que nao aparecem na lista.
+        qtdPendenteInspecao.style.display = items.limitado_dias ? 'none' : '';
+        if (items.limitado_dias) {
             qtdFiltradaInspecao.style.display = 'block';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} dos últimos ${items.limitado_dias} dias (filtre para ver os mais antigos)`;
         } else {
-            qtdFiltradaInspecao.style.display = 'none';
+            qtdFiltradaInspecao.style.display = params.size > 1 ? 'block' : 'none';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
         }
-
-        qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
             let borderColors = {

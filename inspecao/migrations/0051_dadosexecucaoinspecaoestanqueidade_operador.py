@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('cadastro', '0056_mp_ativo'),
-        ('inspecao', '0049_recebimento_excluido'),
+        ('inspecao', '0050_ajustar_checklist_causas_montagem'),
     ]
 
     operations = [

@@ -130,7 +130,10 @@
 <div class="row g-3 mb-4">
     <div class="col-md-7">
         <div class="card h-100">
-            <div class="card-header ch-orange">Top Fornecedores</div>
+            <div class="card-header d-flex justify-content-between align-items-center ch-orange">
+                <span>Top Fornecedores</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-fornecedores" data-nome-csv="recebimento_top_fornecedores" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
+            </div>
             <div class="table-responsive" style="max-height:320px;overflow-y:auto;">
                 <table class="table" id="table-fornecedores">
                     <thead>
@@ -176,4 +179,5 @@
 
 {% block scripts %}
 <script src="{% static 'js/dashboard/dash-recebimento.js' %}?v=devolucoes-por-kpi-20260722"></script>
+    <script src="{% static 'js/dashboard/exportar-csv.js' %}"></script>
 {% endblock %}

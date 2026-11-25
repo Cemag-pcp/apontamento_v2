@@ -145,6 +145,8 @@ document.addEventListener('DOMContentLoaded', function () {
             pctInsp.toFixed(1).replace('.', ',') + '%';
 
         const indice = totalInsp > 0 ? (totalNC / totalInsp) * 100 : 0;
+        document.getElementById('kpi-pct-nc').textContent =
+            indice.toFixed(1).replace('.', ',') + '%';
         document.getElementById('kpi-indice-global').textContent =
             indice.toFixed(2).replace('.', ',') + '%';
     }
@@ -166,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function () {
             tabela.innerHTML = '';
 
             if (data.length === 0) {
-                tabela.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                tabela.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-3">Nenhum dado encontrado para o período selecionado.</td></tr>`;
                 atualizarKPIs(0, 0, 0);
                 return;
             }
@@ -179,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (anoAtual !== null && ano !== anoAtual) {
                     tabela.insertAdjacentHTML('beforeend', `
                         <tr class="table-dark">
-                            <td colspan="9" class="text-center py-1" style="border-top:2px solid #6c757d;border-bottom:2px solid #6c757d;letter-spacing:2px;">
+                            <td colspan="10" class="text-center py-1" style="border-top:2px solid #6c757d;border-bottom:2px solid #6c757d;letter-spacing:2px;">
                                 <small>── fim de ${anoAtual} ──</small>
                             </td>
                         </tr>`);
@@ -192,6 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 totalProd += prod;
                 totalInsp += insp;
                 totalNC   += nc;
+                const pctNC = insp > 0 ? ((nc / insp) * 100).toFixed(2).replace('.', ',') + '%' : '0,00%';
 
                 tabela.insertAdjacentHTML('beforeend', `
                     <tr>
@@ -204,6 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <td>${insp.toLocaleString('pt-BR')}</td>
                         <td>${nc.toLocaleString('pt-BR')}</td>
                         <td>${item["% de inspeção por total de peça"]}</td>
+                        <td>${pctNC}</td>
                     </tr>`);
             });
 

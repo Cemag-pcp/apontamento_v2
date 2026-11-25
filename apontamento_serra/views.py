@@ -17,7 +17,17 @@ from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operad
 from apontamento_usinagem.utils import criar_ordem_usinagem, verificar_se_existe_ordem
 from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelta, ordem_por_maquina, producao_por_maquina
 from core.utils import notificar_ordem
+from core.permissoes import tem_subacesso
 from inspecao.models import Inspecao
+
+# Sub-acesso da tela /serra/ (ver core/permissoes.py e a migracao de sub-acessos)
+SUBACESSO_PLANEJAR = 'serra#planejar'
+
+
+def _sem_permissao_planejar(request):
+    """Usuario logado sem o sub-acesso "Planejar ordem". Chamada sem login
+    passa: a integracao do Google Apps Script cria ordens por /serra/api/criar-ordem/."""
+    return request.user.is_authenticated and not tem_subacesso(request.user, SUBACESSO_PLANEJAR)
 
 import os
 import re
@@ -66,7 +76,8 @@ def planejamento(request):
                                                                     'motivos': motivos,
                                                                     'operadores':operadores,
                                                                     'motivos_maquina_parada':motivos_maquina_parada,
-                                                                    'motivos_exclusao': motivos_exclusao})
+                                                                    'motivos_exclusao': motivos_exclusao,
+                                                                    'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
 
 @login_required
 def get_pecas_ordem(request, pk_ordem, name_maquina):
@@ -718,6 +729,9 @@ def criar_ordem(request):
     if request.method != "POST":
         return JsonResponse({'status': 'error', 'message': 'Método não permitido.'}, status=405)
 
+    if _sem_permissao_planejar(request):
+        return JsonResponse({'status': 'error', 'message': 'Você não tem permissão para planejar ordens.'}, status=403)
+
     try:
         body = json.loads(request.body)
     except json.JSONDecodeError as e:
@@ -786,6 +800,9 @@ def adicionar_pecas_ordem(request):
 
 @csrf_exempt
 def importar_ordens_serra(request):
+    if request.method == "POST" and _sem_permissao_planejar(request):
+        return JsonResponse({'status': 'error', 'message': 'Você não tem permissão para planejar ordens.'}, status=403)
+
     if request.method == "POST":
         arquivo = request.FILES.get('arquivoOrdens')  # Captura o arquivo enviado
         

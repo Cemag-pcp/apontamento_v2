@@ -33,9 +33,12 @@ from ..models import InspecaoRecebimento, InspecaoRecebimentoItem
 # sistema (que nao tem esse problema e se beneficiam do upload paralelo).
 _storage_midia_recebimento = S3Boto3Storage(transfer_config=TransferConfig(use_threads=False))
 
+# "RQ AL-003-000 (Acompanhamento de Entregas)", copia criada em 29/10/2026.
+# A anterior (1mLuw4jM5WpD0pgxXREio15Ju8MZZ7QMJHb3vapz94Ac) foi desativada;
+# a migracao inspecao/0052 levou os itens ja sincronizados para esta.
 SHEET_ID = os.environ.get(
     "RECEBIMENTO_SHEET_ID",
-    "1mLuw4jM5WpD0pgxXREio15Ju8MZZ7QMJHb3vapz94Ac",
+    "1K5MkyAIYmNq3jpSS_GXd5VlqERaBnPW0h8fzxDE-vys",
 )
 SHEET_TAB = os.environ.get(
     "RECEBIMENTO_SHEET_TAB",
@@ -286,23 +289,64 @@ def _find_recebimento_item_by_business_key(dados, data_coluna_a):
     return None
 
 
+def _find_inspecao_existente(dados, sheet_hash):
+    """Inspeção ativa já feita desta nota: mesma linha (hash) ou mesma chave
+    de negócio (CNPJ + pedido + NF) e mesma data na coluna A."""
+    inspecao = InspecaoRecebimento.objects.filter(sheet_hash=sheet_hash, excluido=False).first()
+    if inspecao:
+        return inspecao
+
+    chave = _business_key_payload(dados)
+    if not all(chave.values()):
+        return None
+    data = str((dados or {}).get("Data") or "").strip()
+    candidatas = InspecaoRecebimento.objects.filter(
+        planilha_id=SHEET_ID,
+        aba_nome=SHEET_TAB,
+        excluido=False,
+        dados__contains={"Ch. de Pedido": (dados or {}).get("Ch. de Pedido")},
+    ).order_by("-data_inspecao")
+    for candidata in candidatas:
+        if (
+            _business_key_payload(candidata.dados) == chave
+            and str((candidata.dados or {}).get("Data") or "").strip() == data
+        ):
+            return candidata
+    return None
+
+
+def _mesma_nota(registro, dados, sheet_hash):
+    """O registro de inspeção é desta nota? Mesma linha (hash) ou mesma chave
+    de negócio (CNPJ + pedido + NF)."""
+    return registro.sheet_hash == sheet_hash or (
+        _business_key_payload(registro.dados) == _business_key_payload(dados)
+    )
+
+
 def _sync_recebimento_inspecao_ativa(primary_item, merged_dados, row_index, sheet_hash):
+    """Atualiza com a linha da planilha a inspeção ligada ao item - só a da
+    MESMA nota. Inspeção de outra nota ligada aqui (item sobrescrito no passado,
+    quando o item era casado pelo número da linha) é solta do item: volta pro
+    item certo quando a linha daquela nota sincronizar (_find_inspecao_existente).
+
+    Retorna True se o item tem inspeção ativa desta nota."""
     registros = list(
         InspecaoRecebimento.objects.filter(item=primary_item).order_by(
             "excluido", "-data_inspecao", "-id"
         )
     )
-    if not registros:
-        return
+    da_nota = [r for r in registros if _mesma_nota(r, merged_dados, sheet_hash)]
+    outras = [r.pk for r in registros if not _mesma_nota(r, merged_dados, sheet_hash)]
+    if outras:
+        InspecaoRecebimento.objects.filter(pk__in=outras).update(item=None)
+    if not da_nota:
+        return False
 
-    registro_ativo = next((registro for registro in registros if registro.sheet_hash == sheet_hash), None)
+    registro_ativo = next((registro for registro in da_nota if registro.sheet_hash == sheet_hash), None)
     if registro_ativo is None:
-        registro_ativo = next((registro for registro in registros if not registro.excluido), registros[0])
+        registro_ativo = next((registro for registro in da_nota if not registro.excluido), da_nota[0])
 
     update_fields = []
-    if registro_ativo.item_id != primary_item.id:
-        registro_ativo.item = primary_item
-        update_fields.append("item")
     if registro_ativo.dados != merged_dados:
         registro_ativo.dados = merged_dados
         update_fields.append("dados")
@@ -315,6 +359,7 @@ def _sync_recebimento_inspecao_ativa(primary_item, merged_dados, row_index, shee
 
     if update_fields:
         registro_ativo.save(update_fields=update_fields)
+    return any(not registro.excluido for registro in da_nota)
 
 
 def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, data_coluna_a):
@@ -360,13 +405,23 @@ def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, d
             ]
         )
 
-        if primary_item.inspecionado:
-            _sync_recebimento_inspecao_ativa(
-                primary_item=primary_item,
-                merged_dados=primary_item.dados,
-                row_index=row_index,
-                sheet_hash=sheet_hash,
-            )
+        # inspecionado = tem inspeção ativa DESTA nota (mesma regra do excluir)
+        inspecionado = _sync_recebimento_inspecao_ativa(
+            primary_item=primary_item,
+            merged_dados=primary_item.dados,
+            row_index=row_index,
+            sheet_hash=sheet_hash,
+        )
+        if not inspecionado:
+            # inspeção desta nota que perdeu o item: religa aqui
+            inspecao = _find_inspecao_existente(primary_item.dados, sheet_hash)
+            if inspecao is not None:
+                inspecao.item = primary_item
+                inspecao.save(update_fields=["item"])
+                inspecionado = True
+        if primary_item.inspecionado != inspecionado:
+            primary_item.inspecionado = inspecionado
+            primary_item.save(update_fields=["inspecionado"])
 
     return primary_item
 
@@ -436,25 +491,22 @@ def sincronizar_recebimento(request):
         dados = _montar_dados_linha(header_row, row_values)
 
         try:
-            existing_by_line = InspecaoRecebimentoItem.objects.filter(
-                planilha_id=SHEET_ID,
-                aba_nome=SHEET_TAB,
-                linha_planilha=row_index,
-            ).first()
+            # O numero da linha NAO identifica o recebimento: inserir, apagar ou
+            # ordenar linhas na planilha desloca todas as de baixo, e casar por
+            # linha fundia recebimentos diferentes (um ja inspecionado herdava
+            # outra nota e o original voltava como pendente).
             existing_by_hash = InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).first()
             existing_by_identity = _find_recebimento_item_by_identity(dados, data_coluna_a)
             existing_by_business_key = _find_recebimento_item_by_business_key(dados, data_coluna_a)
 
             existing_item = (
-                existing_by_line
-                or existing_by_hash
+                existing_by_hash
                 or existing_by_business_key
                 or existing_by_identity
             )
             if existing_item:
                 _reconcile_recebimento_items(
                     items=[
-                        existing_by_line,
                         existing_by_hash,
                         existing_by_business_key,
                         existing_by_identity,
@@ -466,16 +518,25 @@ def sincronizar_recebimento(request):
                 )
                 continue
 
-            InspecaoRecebimentoItem.objects.create(
-                planilha_id=SHEET_ID,
-                aba_nome=SHEET_TAB,
-                linha_planilha=row_index,
-                sheet_hash=sheet_hash,
-                dados=dados,
-                data_referencia=data_coluna_a,
-                status_h=True,
-            )
-            novos += 1
+            # A nota pode já ter sido inspecionada e ter perdido o item (ex.:
+            # item sobrescrito por outra nota): não volta como pendente.
+            inspecao_existente = _find_inspecao_existente(dados, sheet_hash)
+            with transaction.atomic():
+                novo_item = InspecaoRecebimentoItem.objects.create(
+                    planilha_id=SHEET_ID,
+                    aba_nome=SHEET_TAB,
+                    linha_planilha=row_index,
+                    sheet_hash=sheet_hash,
+                    dados=dados,
+                    data_referencia=data_coluna_a,
+                    status_h=True,
+                    inspecionado=inspecao_existente is not None,
+                )
+                if inspecao_existente is not None:
+                    inspecao_existente.item = novo_item
+                    inspecao_existente.save(update_fields=["item"])
+            if inspecao_existente is None:
+                novos += 1
         except Exception:
             logger.exception(
                 "Falha ao sincronizar linha %s da planilha de recebimento (sheet_hash=%s). Linha ignorada.",
@@ -533,6 +594,20 @@ def atualizar_item_recebimento(request, item_id):
     incoming_dados = _montar_dados_linha(header_row, row_values)
     data_coluna_a = _parse_br_date(row_values[0])
     sheet_hash = _row_hash_from_list(row_values)
+
+    # A linha salva pode ter sido deslocada na planilha (linhas inseridas,
+    # apagadas ou ordenadas): so atualiza se ainda for o mesmo recebimento.
+    chave_item = _business_key_payload(item.dados)
+    if any(chave_item.values()) and _business_key_payload(incoming_dados) != chave_item:
+        return JsonResponse(
+            {
+                "error": (
+                    f"A linha {item.linha_planilha} da planilha agora é de outro recebimento "
+                    "(a planilha foi alterada). Sincronize novamente para localizar a linha correta."
+                )
+            },
+            status=409,
+        )
 
     # So sobrescreve campos que ja estavam preenchidos se o novo valor tambem
     # vier preenchido - evita apagar dado bom por causa de uma leitura vazia.

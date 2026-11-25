@@ -65,6 +65,17 @@ TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 # Certifique-se de que a pasta existe
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+from core.erp_apontamento import (
+    MENSAGEM_AGUARDANDO_ERP,
+    MENSAGEM_ITEM_BLOQUEADO,
+    TIMEOUT_ERP_APONTAMENTO,
+    marcar_aguardando_confirmacao_erp,
+    resolver_aguardando_erp,
+    resposta_aguardando_erp,
+    resposta_incerta,
+    resposta_item_bloqueado,
+)
+
 PROCESSOS_APONTAMENTO_DEPOSITODEST_FALLBACK_CORTE = [
     "S C Serras",
     "S C Plasma",
@@ -88,7 +99,7 @@ def _post_apontamento_erp_corte(payload, bypass_disable=False):
         _url_apontamento_erp_corte(),
         json=payload,
         auth=("luan araujo", "luanaraujo7"),
-        timeout=(5, 20),
+        timeout=TIMEOUT_ERP_APONTAMENTO,
     )
 
 def _erro_depositodest_indefinido_corte(descricao):
@@ -113,6 +124,11 @@ def _tentar_apontamento_depositodest_processos_alternativos_corte(payload_integr
         try:
             response_integracao = _post_apontamento_erp_corte(payload_tentativa)
         except requests.RequestException as exc:
+            if resposta_incerta(exc):
+                # pode ter gravado no ERP com este processo: parar aqui, sem
+                # tentar outro processo, e deixar o item aguardando conferencia
+                tentativas.append({'processo': processo, 'erro': str(exc), 'incerto': True})
+                break
             tentativas.append({'processo': processo, 'erro': f'Falha de comunicacao com API ERP: {exc}'})
             continue
 
@@ -147,6 +163,9 @@ def _tentar_apontamento_depositodest_processos_alternativos_corte(payload_integr
         })
 
     return None, None, tentativas
+
+def _tentativas_incertas_corte(tentativas):
+    return any(t.get('incerto') for t in (tentativas or []))
 
 def _mensagem_processo_alternativo_depositodest(payload_original, payload_final):
     processo_original = payload_original.get('processo')
@@ -930,7 +949,7 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
     dados_chapa_por_ordem = {}
 
     for item in itens:
-        if item.apontado:
+        if item.apontado or item.aguardando_confirmacao_erp:
             continue
 
         if item.ordem_id not in dados_chapa_por_ordem:
@@ -998,6 +1017,16 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
     try:
         response_integracao = _post_apontamento_erp_corte(payload_integracao)
     except requests.RequestException as exc:
+        if resposta_incerta(exc):
+            for item in itens_validos:
+                marcar_aguardando_confirmacao_erp(item, user, exc)
+            return {
+                'enviado': False,
+                'aguardando_confirmacao_erp': True,
+                'sucessos': [],
+                'erros': erros + [{'id': item.id, 'erro': MENSAGEM_AGUARDANDO_ERP} for item in itens_validos],
+                'payload_enviado': payload_integracao,
+            }
         erro = f'Falha de comunicacao com API ERP: {exc}'
         for item in itens_validos:
             item.erro_apontamento = erro
@@ -1077,6 +1106,10 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
                     })
                     continue
                 retorno_item['tentativas_processos_alternativos'] = tentativas
+                if _tentativas_incertas_corte(tentativas):
+                    marcar_aguardando_confirmacao_erp(item, user)
+                    erros.append({'id': item.id, 'erro': MENSAGEM_AGUARDANDO_ERP, 'retorno_api': retorno_item})
+                    continue
             item.erro_apontamento = descricao_erro
             item.tipo_apontamento = 'api'
             item.resp_apontamento = user
@@ -2108,8 +2141,12 @@ def get_ordens_criadas_duplicar_ordem(request):
         return JsonResponse({'draw': draw, 'recordsTotal': records_filtered, 'recordsFiltered': records_filtered, 'data': []})
 
     # Otimização da Serialização dos Dados (existente)
-    data = [
-        {
+    data = []
+    for ordem in ordens_page:
+        prop = _propriedade_ordem(ordem)
+        # aproveitamento pode vir nulo em ordem recem-criada
+        aproveitamento = round(prop.aproveitamento, 5) if prop and prop.aproveitamento is not None else None
+        data.append({
             'id': ordem.pk,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
@@ -2117,19 +2154,18 @@ def get_ordens_criadas_duplicar_ordem(request):
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'excluida': ordem.excluida,
-            'aproveitamento': round(_propriedade_ordem(ordem).aproveitamento, 5) if _propriedade_ordem(ordem) else None,
+            'aproveitamento': aproveitamento,
             'propriedade': {
-                'descricao_mp': _propriedade_ordem(ordem).descricao_mp if _propriedade_ordem(ordem) else None,
-                'quantidade': _propriedade_ordem(ordem).quantidade if _propriedade_ordem(ordem) else None,
-                'tipo_chapa': _propriedade_ordem(ordem).get_tipo_chapa_display() if _propriedade_ordem(ordem) else None,
-                'aproveitamento': round(_propriedade_ordem(ordem).aproveitamento, 5) if _propriedade_ordem(ordem) else None,
-                'retalho': 'Sim' if _propriedade_ordem(ordem) and _propriedade_ordem(ordem).retalho else None,
+                'descricao_mp': prop.descricao_mp if prop else None,
+                'quantidade': prop.quantidade if prop else None,
+                'tipo_chapa': prop.get_tipo_chapa_display() if prop else None,
+                'aproveitamento': aproveitamento,
+                'retalho': 'Sim' if prop and prop.retalho else None,
             }
-        } for ordem in ordens_page
-    ]
+        })
 
-    #  Ordena os dados com base no aproveitamento corrigido (existente)
-    data.sort(key=lambda x: x['aproveitamento'], reverse=True)
+    #  Ordena os dados com base no aproveitamento corrigido; sem aproveitamento vai pro fim
+    data.sort(key=lambda x: (x['aproveitamento'] is not None, x['aproveitamento'] or 0), reverse=True)
 
     return JsonResponse({
         'draw': draw,
@@ -2658,6 +2694,8 @@ def api_erp_apontamentos_corte(request):
         queryset = queryset.filter(apontado=False, data_apontamento__isnull=True).filter(
             Q(chave_apontamento__isnull=True) | Q(chave_apontamento='')
         )
+    elif filtros['apontado'] == 'aguardando':
+        queryset = queryset.filter(aguardando_confirmacao_erp=True)
 
     paginator = Paginator(queryset, limit)
     pagina = paginator.get_page(page)
@@ -2712,6 +2750,7 @@ def api_erp_apontamentos_corte(request):
             'tipo_apontamento': item.tipo_apontamento or '',
             'chave_apontamento': item.chave_apontamento or '',
             'erro_apontamento': item.erro_apontamento or '',
+            'aguardando_confirmacao_erp': item.aguardando_confirmacao_erp,
             'resp_apontamento': (item.resp_apontamento.get_full_name() or item.resp_apontamento.username) if item.resp_apontamento else '',
             'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M') if item.data_apontamento else '',
             'data_producao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M') if ordem.ultima_atualizacao else '',
@@ -2831,6 +2870,9 @@ def api_erp_apontar_item_corte(request, pk):
                 status=409
             )
 
+        if item.aguardando_confirmacao_erp:
+            return resposta_item_bloqueado()
+
         if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
             msg_qtd_morta = (
                 'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
@@ -2897,6 +2939,9 @@ def api_erp_apontar_item_corte(request, pk):
             try:
                 response_integracao = _post_apontamento_erp_corte(payload_integracao, bypass_disable=True)
             except requests.RequestException as exc:
+                if resposta_incerta(exc):
+                    marcar_aguardando_confirmacao_erp(item, request.user, exc)
+                    return resposta_aguardando_erp(payload_integracao)
                 return JsonResponse(
                     {
                         'status': 'error',
@@ -2962,6 +3007,9 @@ def api_erp_apontar_item_corte(request, pk):
                                 ),
                             ]
                             item.erro_apontamento = ' '.join(aviso for aviso in avisos if aviso) or None
+                        elif _tentativas_incertas_corte(tentativas):
+                            marcar_aguardando_confirmacao_erp(item, request.user)
+                            return resposta_aguardando_erp(payload_integracao)
                         else:
                             item.erro_apontamento = descricao_erro
                             item.tipo_apontamento = 'api'
@@ -3110,6 +3158,10 @@ def api_erp_apontar_itens_corte_bloco(request):
                 erros.append({'id': item.id, 'erro': 'Item ja apontado.'})
                 continue
 
+            if item.aguardando_confirmacao_erp:
+                erros.append({'id': item.id, 'erro': MENSAGEM_ITEM_BLOQUEADO})
+                continue
+
             if tipo_apontamento == 'api':
                 if item.ordem_id not in dados_chapa_por_ordem:
                     propriedade = getattr(item.ordem, 'propriedade', None)
@@ -3208,6 +3260,20 @@ def api_erp_apontar_itens_corte_bloco(request):
         try:
             response_integracao = _post_apontamento_erp_corte(payload_integracao, bypass_disable=True)
         except requests.RequestException as exc:
+            if resposta_incerta(exc):
+                for item in itens_validos:
+                    marcar_aguardando_confirmacao_erp(item, request.user, exc)
+                return JsonResponse(
+                    {
+                        'status': 'error',
+                        'aguardando_confirmacao_erp': True,
+                        'message': MENSAGEM_AGUARDANDO_ERP,
+                        'description': MENSAGEM_AGUARDANDO_ERP,
+                        'payload_enviado': payload_integracao,
+                        'erros': erros,
+                    },
+                    status=504
+                )
             return JsonResponse(
                 {
                     'status': 'error',
@@ -3288,6 +3354,11 @@ def api_erp_apontar_itens_corte_bloco(request):
                         })
                         continue
                     retorno_item['tentativas_processos_alternativos'] = tentativas
+                    if _tentativas_incertas_corte(tentativas):
+                        marcar_aguardando_confirmacao_erp(item, request.user)
+                        erros.append({'id': item.id, 'erro': MENSAGEM_AGUARDANDO_ERP, 'retorno_api': retorno_item})
+                        erro_negocio = True
+                        continue
                 item.erro_apontamento = descricao_erro
                 item.tipo_apontamento = 'api'
                 item.resp_apontamento = request.user
@@ -3714,3 +3785,14 @@ def indicador_peca_produzida_maquina(request):
     resultado = producao_por_maquina(data_inicio, data_fim)
 
     return JsonResponse(resultado)    
+
+
+@login_required
+@require_POST
+def api_erp_resolver_aguardando_corte(request, pk):
+    """Confirmar que entrou no ERP / liberar para reenviar (ver core/erp_apontamento.py)."""
+    return resolver_aguardando_erp(
+        request,
+        PecasOrdem.objects.filter(ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3']),
+        pk,
+    )

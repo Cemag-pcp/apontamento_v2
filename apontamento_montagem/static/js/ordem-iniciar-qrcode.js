@@ -1,4 +1,14 @@
+import { ativarVariosOperadores, limparOperadores, operadoresEscolhidos } from './operadores-multiplos.js';
 import { confirmarInicioOrdem } from './apontamento-utils.js';
+import { confirmarInicioSeProximoProcesso } from './proximo-processo.js';
+
+// "2026-11-06" (ou "2026-11-06T...") -> "06/11/2026". Por texto, sem new Date(),
+// pra uma data pura nao voltar um dia pelo fuso. Outros formatos voltam como vieram.
+function formatarDataBR(valor) {
+    if (!valor) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(valor));
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : valor;
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     // Pega a string de parâmetros da URL atual
@@ -96,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div class="card-body bg-white p-3">
                             <p class="card-text mb-3">
-                                <strong>Data Carga:</strong> ${ordem.data_carga}
+                                <strong>Data Carga:</strong> ${formatarDataBR(ordem.data_carga)}
                             </p>
                             <p class="card-text mb-3">
                                 <strong>Quantidade a fazer:</strong> ${ordem.qtd_planejada}
@@ -107,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <p class="card-text mb-0"><strong>Status: </strong><span class="badge ${statusClass}">${ordem.status}</span></p>
                         </div>
                         <div class="card-footer d-flex justify-content-end align-items-center bg-white p-3 border-top">
-                            <button class="btn btn-warning btn-sm" title="Iniciar">
+                            <button class="btn btn-warning btn-sm" title="Iniciar" data-status="${ordem.status}">
                                 <i class="fa fa-play"></i> Iniciar
                             </button>
                         </div>
@@ -141,8 +151,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', async function(event) {
         if (event.target.closest('.btn-warning')) {
+            // ordem em "Próximo Processo": confirma antes de iniciar
+            if (!(await confirmarInicioSeProximoProcesso(event.target.closest('.btn-warning').dataset.status, ordemId))) return;
             const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
             document.getElementById('confirmModal').removeAttribute("aria-hidden");
             modal.show();
@@ -233,33 +245,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
     
-        // Determinar qual select está ativo e obter o valor do operador
-        let operadorId;
-        if (operadorFinal.style.display !== 'none' && operadorFinal.getAttribute('data-active') === 'true') {
-            if (!operadorFinal.value || operadorFinal.value === "") {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Atenção',
-                    text: 'Por favor, selecione um operador da máquina.'
-                });
-                return;
-            }
-            operadorId = operadorFinal.value;
-        } else if (todosOperadorFinal.style.display !== 'none' && todosOperadorFinal.getAttribute('data-active') === 'true') {
-            if (!todosOperadorFinal.value || todosOperadorFinal.value === "") {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Atenção',
-                    text: 'Por favor, selecione um operador da lista geral.'
-                });
-                return;
-            }
-            operadorId = todosOperadorFinal.value;
-        } else {
+        // um ou mais operadores (etiquetas em operadoresFinaisEscolhidos)
+        const operadorId = operadoresEscolhidos('operadoresFinaisEscolhidos');
+        if (!operadorId.length) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Atenção',
-                text: 'Por favor, selecione um operador válido.'
+                text: 'Selecione ao menos um operador.'
             });
             return;
         }
@@ -286,7 +278,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const payload = {
             status: "finalizada",
             ordem_id: parseInt(ordemId),
-            operador_final: parseInt(operadorId),
+            operador_final: parseInt(operadorId[0]),
+        operadores_final: operadorId.map((id) => parseInt(id)),
             obs_finalizar: obsFinalizar,
             qt_realizada: parseInt(qtRealizada.value)
         };
@@ -372,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div class="col-12 col-md-auto mb-2 mb-md-0">
                                         <strong class="me-2">Data Carga:</strong>
-                                        <span class="text-dark me-3">${ordem.data_carga}</span>
+                                        <span class="text-dark me-3">${formatarDataBR(ordem.data_carga)}</span>
                                     </div>
                                     <div class="col-12 col-md-auto mb-2 mb-md-0">
                                         <strong class="me-2">Qt. Restante:</strong>
@@ -416,6 +409,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function mostrarModalFinalizar(ordemId, maquina, max_itens) {
+        limparOperadores('operadoresFinaisEscolhidos');
         const modal = new bootstrap.Modal(document.getElementById('finalizarModal'));
 
         const operadorSelect = document.getElementById('operadorFinal');
@@ -484,3 +478,5 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.show();
     }
 });
+// selects de operador do modal Finalizar: escolha de um ou mais
+ativarVariosOperadores(['operadorFinal', 'todosOperadorFinal'], 'operadoresFinaisEscolhidos');

@@ -360,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length === 0) {
                 tabela.innerHTML = `
                     <tr>
-                        <td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
+                        <td colspan="7" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
                     </tr>
                 `;
                 atualizarKPIs(0, 0, 0);
@@ -368,6 +368,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             data.forEach(item => {
+                const insp = Number(item["N° de inspeções"]) || 0;
+                const nc = Number(item["N° de peças não conforme"]) || 0;
+                const pctNC = insp > 0 ? ((nc / insp) * 100).toFixed(2).replace('.', ',') + '%' : '0,00%';
                 const row = `
                     <tr>
                         <td>${formatDateBr(item.Data)}</td>
@@ -376,6 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${item["N° de peças não conforme"]}</td>
                         <td>${item["Lotes não conforme"]}</td>
                         <td>${item["% de inspeção"]}</td>
+                        <td>${pctNC}</td>
                     </tr>
                 `;
                 tabela.insertAdjacentHTML('beforeend', row);
@@ -395,10 +399,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function atualizarKPIs(totalProd, totalInsp, totalNC) {
         const pctInsp     = totalProd > 0 ? (totalInsp / totalProd * 100).toFixed(0) : 0;
         const indiceGlobal = totalInsp > 0 ? (totalNC / totalInsp * 100).toFixed(2).replace('.', ',') : '0,00';
+        const pctNC        = totalInsp > 0 ? (totalNC / totalInsp * 100).toFixed(1).replace('.', ',') : '0,0';
 
         document.getElementById('kpi-pecas-pintadas').textContent     = totalProd.toLocaleString('pt-BR');
         document.getElementById('kpi-pecas-inspecionadas').textContent = totalInsp.toLocaleString('pt-BR');
         document.getElementById('kpi-pct-inspecao').textContent        = pctInsp + '%';
+        document.getElementById('kpi-pct-nc').textContent              = pctNC + '%';
         document.getElementById('kpi-nao-conformidade').textContent    = totalNC.toLocaleString('pt-BR');
         document.getElementById('kpi-indice-global').textContent       = indiceGlobal + '%';
     }

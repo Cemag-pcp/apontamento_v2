@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'storages',
     'reuniao',
     'assistente_ia',
+    'inventario',
 
     'corsheaders',
 

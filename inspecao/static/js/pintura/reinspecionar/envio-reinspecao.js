@@ -21,7 +21,20 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
         // --- LÓGICA PARA NÃO CONFORMIDADE ---
         let totalQuantidadeInput = 0;
         const selectContainerInspecao = document.querySelectorAll(".selectContainerReinspecao");
-        
+
+        // validarImagensNaoConformidadePintura vem de inspecionar/enviar-inspecao.js
+        const semFoto = validarImagensNaoConformidadePintura(selectContainerInspecao);
+        if (semFoto.length > 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Foto obrigatória na não conformidade',
+                html: 'Anexe ao menos uma foto em:<br>' + semFoto.join('<br>'),
+            });
+            buttonInspecionarPintura.disabled = false;
+            buttonInspecionarPintura.querySelector(".spinner-border").style.display = "none";
+            return;
+        }
+
         selectContainerInspecao.forEach((container, index) => {
             const causaSelect = container.querySelector('select');
             const quantidadeInput = container.querySelector('input[type="number"]');

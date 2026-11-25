@@ -165,6 +165,88 @@
             .ficha-doc-footer { flex-direction: column; align-items: flex-start; }
             .ficha-doc-id { text-align: left; }
         }
+
+        .checklist-causas-montagem {
+            border: 1px solid #e2e8f0;
+            border-radius: .5rem;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .checklist-causa-item {
+            border-bottom: 1px solid #e2e8f0;
+            padding: .6rem .85rem;
+        }
+        .checklist-causa-item:last-child { border-bottom: none; }
+        .checklist-causa-item:has(.causa-status-nok:checked) {
+            background: #fff1f2;
+        }
+        .checklist-causa-item:has(.causa-status-ok:checked) {
+            background: #f0fdf4;
+        }
+        .checklist-causa-header {
+            margin-bottom: 0;
+            gap: .75rem;
+        }
+        .checklist-causa-label {
+            font-weight: 500;
+        }
+        /* falhas de cada grupo (habilitadas só com o grupo em Ñ OK) */
+        .checklist-falhas-grupo { margin-top: .45rem; }
+        .checklist-falhas-grupo .outros-causas-lista {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            column-gap: 1rem;
+        }
+        .checklist-falhas-grupo .form-check-input:disabled ~ .form-check-label { opacity: .55; }
+        .checklist-causa-detalhes {
+            margin-top: .6rem;
+            padding-top: .6rem;
+            border-top: 1px dashed #e2e8f0;
+        }
+
+        .label-modal-sm {
+            display: block;
+            font-size: .68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #64748b;
+            margin-bottom: .2rem;
+        }
+        .campo-readonly-compacto {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #334155;
+        }
+        .campo-readonly-compacto:disabled {
+            background: #f8fafc;
+            opacity: 1;
+        }
+
+        .unidade-checklist-card {
+            border: 1px solid #e2e8f0;
+            border-radius: .5rem;
+            margin-bottom: .6rem;
+            overflow: hidden;
+        }
+        .unidade-checklist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: .55rem .85rem;
+            background: #f8fafc;
+            cursor: pointer;
+        }
+        .unidade-checklist-header .unidade-checklist-titulo {
+            font-weight: 600;
+            font-size: .85rem;
+        }
+        .unidade-checklist-card .checklist-causas-montagem {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            border-radius: 0;
+            max-height: none;
+        }
     </style>
 
 {% endblock %}
@@ -172,6 +254,7 @@
 {% block content %}
 
 <h2 class="my-4">Inspeção Montagem</h2>
+<div data-pct-inspecao='[{"titulo": "Montagem", "meta": 45, "api": "/inspecao/montagem/api/indicador-montagem-resumo-analise-temporal/", "prod": "N° de peças produzidas", "insp": "N° de inspeções"}]'></div>
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
@@ -199,14 +282,16 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Inspeções pendentes</h4>
         <div>
-            <div class="btn-group">
-                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                <form id="form-filtrar-inspecao">
-                    <div class="dropdown-menu p-3" style="width: 250px;">
-                        <p class="fw-bold mx-2 my-1">Filtrar inspeções</p>
-                        <hr>
+            <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-filtro-inspecao" aria-controls="offcanvas-filtro-inspecao">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-filtro-inspecao" aria-labelledby="offcanvas-filtro-inspecao-label" style="width: 320px;">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="offcanvas-filtro-inspecao-label">Filtrar inspeções</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                </div>
+                <form id="form-filtrar-inspecao" class="offcanvas-body">
+                    <div>
                         <input type="text" class="form-control mb-3" id="pesquisar-peca-inspecao" placeholder="Pesquisar as peças...">
                         
                         <h6>Máquina</h6>
@@ -239,7 +324,7 @@
 
                         <div class="d-flex justify-content-between mt-3">
                             <button type="button" id="btn-limpar-inspecao-montagem"  class="btn btn-outline-secondary">Limpar</button>
-                            <button type="button" id="btn-filtrar-inspecao-montagem" class="btn btn-dark">Filtrar</button>
+                            <button type="button" id="btn-filtrar-inspecao-montagem" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                         </div>
                     </div>
                 </form>
@@ -268,14 +353,16 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Requerem reinspeção</h4>
         <div>
-            <div class="btn-group">
-                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                <form id="form-filtrar-reinspecao" action="">
-                    <div class="dropdown-menu p-3" style="width: 250px;">
-                        <p class="fw-bold mx-2 my-1">Filtros</p>
-                        <hr>
+            <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-filtro-reinspecao" aria-controls="offcanvas-filtro-reinspecao">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-filtro-reinspecao" aria-labelledby="offcanvas-filtro-reinspecao-label" style="width: 320px;">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="offcanvas-filtro-reinspecao-label">Filtrar reinspeções</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                </div>
+                <form id="form-filtrar-reinspecao" action="" class="offcanvas-body">
+                    <div>
                         <input id="pesquisar-peca-reinspecao" type="text" class="form-control mb-3" placeholder="Pesquisar...">
                         
                         <h6>Máquina</h6>
@@ -316,7 +403,7 @@
 
                         <div class="d-flex justify-content-between mt-3">
                             <button id="btn-limpar-reinspecao" class="btn btn-outline-secondary">Limpar</button>
-                            <button id="btn-filtrar-reinspecao" class="btn btn-dark">Filtrar</button>
+                            <button id="btn-filtrar-reinspecao" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                         </div>
                     </div>
                 </form>
@@ -348,15 +435,21 @@
         <div class="d-flex gap-2">
             <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
             <div>
-                <div class="btn-group">
-                    <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                        <i class="bi bi-funnel"></i> Filtrar
-                    </button>
-                    <form id="form-filtrar-inspecionados" action="">
-                        <div class="dropdown-menu p-3" style="width: 250px;">
-                            <p class="fw-bold mx-2 my-1">Filtros</p>
-                            <hr>
+                <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-filtro-inspecionados" aria-controls="offcanvas-filtro-inspecionados">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-filtro-inspecionados" aria-labelledby="offcanvas-filtro-inspecionados-label" style="width: 320px;">
+                    <div class="offcanvas-header">
+                        <h5 class="offcanvas-title" id="offcanvas-filtro-inspecionados-label">Filtrar inspeções realizadas</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                    </div>
+                    <form id="form-filtrar-inspecionados" action="" class="offcanvas-body">
+                        <div>
                             <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">
+                            <div class="form-check mb-3">
+                                <input type="checkbox" id="filter-itens-reinspecionadas" value="">
+                                <label class="form-check-label" for="filter-itens-reinspecionadas">Somente reinspecionadas</label>
+                            </div>
                             
                             <h6>Filtrar por</h6>
                             <div style="max-height: 160px; overflow-y: auto;">
@@ -408,7 +501,7 @@
 
                             <div class="d-flex justify-content-between mt-3">
                                 <button id="btn-limpar-inspecionados" class="btn btn-outline-secondary">Limpar</button>
-                                <button id="btn-filtrar-inspecionados" class="btn btn-dark">Filtrar</button>
+                                <button id="btn-filtrar-inspecionados" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                             </div>
                         </div>
                     </form>
@@ -452,6 +545,7 @@
 <script src="{% static 'js/montagem/inspecionados/modal-inspecionados.js' %}?v=ficha-modal-20260722"></script>
 <script src="{% static 'js/montagem/inspecionados/excluir-execucao.js' %}"></script>
 <script src="{% static 'js/geral/utils.js' %}"></script>
+<script src="{% static 'js/geral/percentual-inspecao.js' %}"></script>
 
 <script>
 

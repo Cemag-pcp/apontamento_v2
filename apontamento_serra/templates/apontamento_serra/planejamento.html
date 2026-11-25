@@ -211,12 +211,14 @@
                     <button type="button" class="btn btn-parada me-2" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
                         <i class="bi bi-stop-circle"></i> Parada de máquina
                     </button>
+                    {% if pode_planejar %}
                     <button type="button" class="btn btn-criar-op" data-bs-toggle="modal" data-bs-target="#modalSerra">
-                        <i class="bi bi-plus-circle"></i> Planejar 
+                        <i class="bi bi-plus-circle"></i> Planejar
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalImportarOpSerra">
                         Importar Ordens
                     </button>
+                    {% endif %}
                 </div>
             </div>
             <div class="filter-body">

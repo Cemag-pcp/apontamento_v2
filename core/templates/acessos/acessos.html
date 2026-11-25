@@ -45,6 +45,8 @@
     }
     .perm-item:hover { background: #f0f4ff; }
     .perm-item.hidden { display: none; }
+    /* sub-acesso: ação dentro da tela logo acima */
+    .perm-item.perm-subitem { padding-left: 32px; }
 
     .perm-counter {
         font-size: .75rem;
@@ -444,6 +446,23 @@
         input.dispatchEvent(new Event('input'));
     });
 
+    // Sub-acessos (nome "<tela>#<acao>", ver core/permissoes.py) vão logo
+    // abaixo da tela a que pertencem; sem a tela no grupo, ficam no fim.
+    function ordenarComSubacessos(rotas) {
+        const subPorTela = {};
+        rotas.filter(r => r.nome.includes('#')).forEach(r => {
+            const tela = r.nome.split('#')[0];
+            (subPorTela[tela] = subPorTela[tela] || []).push(r);
+        });
+        const ordenadas = [];
+        rotas.filter(r => !r.nome.includes('#')).forEach(r => {
+            ordenadas.push(r, ...(subPorTela[r.nome] || []));
+            delete subPorTela[r.nome];
+        });
+        Object.values(subPorTela).forEach(subs => ordenadas.push(...subs));
+        return ordenadas;
+    }
+
     async function openModal(userId) {
         const selectedUser = users.find(u => u.id === userId);
         if (!selectedUser) return;
@@ -514,12 +533,13 @@
                 `;
 
                 const sectionBody = wrap.querySelector(`#${sectionId}`);
-                rotas.forEach(rota => {
+                ordenarComSubacessos(rotas).forEach(rota => {
+                    const ehSubacesso = rota.nome.includes('#');
                     const item = document.createElement('div');
-                    item.className = 'perm-item';
+                    item.className = ehSubacesso ? 'perm-item perm-subitem' : 'perm-item';
                     item.innerHTML = `
                         <label class="form-check-label small flex-grow-1" for="access-${rota.id}" style="cursor:pointer">
-                            ${rota.descricao}
+                            ${ehSubacesso ? '<i class="bi bi-arrow-return-right text-muted me-1"></i>' : ''}${rota.descricao}
                         </label>
                         <div class="form-check form-switch mb-0 ms-2">
                             <input class="form-check-input" type="checkbox" role="switch"

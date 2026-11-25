@@ -1,3 +1,5 @@
+import { ativarVariosOperadores, limparOperadores, operadoresEscolhidos } from './operadores-multiplos.js';
+import { confirmarInicioSeProximoProcesso } from './proximo-processo.js';
 // import { confirmarInicioOrdem } from './apontamento-utils.js';
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -61,10 +63,13 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarDadosOrdem(ordemId);
     fetchOrdensIniciadas();
 
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', async function(event) {
         if (event.target.closest('.btn-warning')) {
             const maquina = event.target.closest('.btn-warning');
             const maquinaNome = maquina.getAttribute('data-maquina-nome');
+
+            // ordem em "Próximo Processo": confirma antes de iniciar
+            if (!(await confirmarInicioSeProximoProcesso(maquina.dataset.status, ordemId))) return;
 
             mostrarModalIniciar(ordemId, maquinaNome);
             
@@ -160,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <p class="card-text mb-0"><strong>Status: </strong><span class="badge ${statusClass}">${ordem.status}</span></p>
                         </div>
                         <div class="card-footer d-flex justify-content-end align-items-center bg-white p-3 border-top">
-                            <button class="btn btn-warning btn-sm" data-title="Iniciar" data-maquina-nome="${ordem.maquina}">
+                            <button class="btn btn-warning btn-sm" data-title="Iniciar" data-status="${ordem.status}" data-maquina-nome="${ordem.maquina}">
                                 <i class="fa fa-play"></i> Iniciar
                             </button>
                         </div>
@@ -200,6 +205,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function mostrarModalIniciar(ordemId, maquina) {
         const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+        limparOperadores('operadoresIniciaisEscolhidos');
 
         const operadorSelect = document.getElementById('operadorInicial');
         const labelOperadores = document.getElementById('labelOperadoresInicial');
@@ -276,7 +283,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     status: "iniciada",
                     ordem_id: ordemId,
-                    operador_inicio: operadorId
+                    operador_inicio: operadorId[0],
+                    operadores_inicio: operadorId
                 })
             });
 
@@ -335,33 +343,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const operadorInicio = document.getElementById('operadorInicial');
         const todosOperadorInicio = document.getElementById('todosOperadorInicial');
 
-        // Determinar qual select está ativo e obter o valor do operador
-        let operadorId;
-        if (operadorInicio.style.display !== 'none' && operadorInicio.getAttribute('data-active') === 'true') {
-            if (!operadorInicio.value || operadorInicio.value === "") {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Atenção',
-                    text: 'Por favor, selecione um operador da máquina.'
-                });
-                return;
-            }
-            operadorId = operadorInicio.value;
-        } else if (todosOperadorInicio.style.display !== 'none' && todosOperadorInicio.getAttribute('data-active') === 'true') {
-            if (!todosOperadorInicio.value || todosOperadorInicio.value === "") {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Atenção',
-                    text: 'Por favor, selecione um operador da lista geral.'
-                });
-                return;
-            }
-            operadorId = todosOperadorInicio.value;
-        } else {
+        // um ou mais operadores (etiquetas em operadoresIniciaisEscolhidos)
+        const operadorId = operadoresEscolhidos('operadoresIniciaisEscolhidos');
+        if (!operadorId.length) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Atenção',
-                text: 'Por favor, selecione um operador válido.'
+                text: 'Selecione ao menos um operador.'
             });
             return;
         }
@@ -736,3 +724,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 });
+// selects de operador do modal Iniciar: escolha de um ou mais
+ativarVariosOperadores(['operadorInicial', 'todosOperadorInicial'], 'operadoresIniciaisEscolhidos');

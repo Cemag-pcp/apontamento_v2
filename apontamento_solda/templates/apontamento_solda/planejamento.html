@@ -6,6 +6,7 @@
 {% endblock %}
 
 {% block links %}
+<link rel="stylesheet" href="{% static 'css/painel-producao.css' %}">
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
     <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
     <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
@@ -58,89 +59,76 @@
 {% endblock %}
 
 {% block content %}
-<div>
-
-    <!-- Título Principal -->
-    <div class="text-center mb-5">
-        <h1 class="display-5">Apontamento de solda</h1>
-        <p class="text-muted">Gerencie e acompanhe os processos de solda.</p>
-    </div>
-
-    <!-- Container para Andamento da carga do dia escolhido no filtro -->
-    <div class="mb-5">
-        <div class="row gx-4">
-            <!-- Coluna 1: Status de Máquina -->
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
-                    Status de Máquina
-                    <button type="button" class="btn btn-danger" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina" title="Parada de máquina">
-                        <i class="fas fa-stop-circle"></i> <small>Reportar parada</small>
-                    </button>
-                    <button class="btn btn-sm" id="refresh-status-maquinas">
-                        🔄
-                    </button>
-                </h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="text-center mb-3">
-                        <div class="display-4 text-primary">-</div>
-                        <p class="text-muted">Máquinas em operação</p>
-                    </div>
-                    <div class="border-top pt-2">
-                        <ul class="list-group list-group-flush" id="machine-status-list" style="overflow-y:auto; max-height: 150px;">
-                            <!-- Lista de status das máquinas -->
-                        </ul>
-                    </div>
-                </div>
-                <!-- Legenda abaixo da coluna -->
-                <div class="text-center mt-3">
-                    <span class="legend">
-                        <span class="badge bg-warning rounded-circle" style="width: 15px; height: 15px; display: inline-block;"></span> Ocioso
-                        <span class="badge bg-danger rounded-circle" style="width: 15px; height: 15px; display: inline-block; margin-left: 10px;"></span> Parado
-                        <span class="badge bg-success rounded-circle" style="width: 15px; height: 15px; display: inline-block; margin-left: 10px;"></span> Em operação
-                    </span>
-                </div>
-            </div>
-            <!-- Coluna 2: Status para andamneto da carga do dia escolhido no filtro -->
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
-                    Andamento carga
-                    <button class="btn btn-sm" id="refresh-status-carga">🔄</button>
-                </h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="text-center mb-3">
-                        <div id="percentual-carga" class="display-4 text-primary">Escolha uma data</div>
-                        <p class="text-muted">Concluído</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Coluna 3: Status de cargas 5 dias -->
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
-                    Últimas 10 cargas
-                    <button class="btn btn-sm" id="refresh-pecas">
-                        🔄
-                    </button>
-                </h4>
-                <div class="border rounded p-3 bg-light" style="height: auto; max-height: 230px; overflow-y: auto;">
-                    <ul class="list-group" id="ultimas-pecas-list"></ul>
-                </div>
-            </div>
-    
+<div class="painel-producao">
+    <div class="dashboard-header">
+        <div class="dashboard-title">
+            <h1>Painel de Produção</h1>
+            <p>Visão operacional de solda em tempo real.</p>
+        </div>
+        <div class="dashboard-actions">
+            <button type="button" class="btn btn-outline-primary" id="btnQrCode" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
+                <i class="bi bi-qr-code-scan"></i> Qr Code
+            </button>
+            <button type="button" class="btn btn-success" id="btnForaSequenciamento" data-bs-toggle="modal" data-bs-target="#modalForaSequenciamento">
+                <i class="fas fa-random"></i> Produção fora do sequenciamento
+            </button>
+            <button type="button" class="btn btn-parada" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
+                <i class="bi bi-stop-circle"></i> Parada de máquina
+            </button>
         </div>
     </div>
 
-    <div id="containerPlanejar" class="mb-5">
-
-        <!-- Painel de Ordens Criadas -->
-        <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
-    
-        <!-- Formulário de Filtro -->
-        <form id="filtro-form" class="mb-4 p-4 border rounded bg-light shadow-sm">
-            <div class="d-flex justify-content-end gap-3 mb-4">
-                <small><button type="button" class="btn btn-success" id="btnForaSequenciamento" data-bs-toggle="modal" data-bs-target="#modalForaSequenciamento">
-                    Produção fora do sequenciamento
-                </button></small>
+    <div class="top-grid">
+        <div class="top-card">
+            <div class="top-card-title">
+                <span><i class="fas fa-cogs"></i> Status das Máquinas</span>
+                <button class="btn btn-sm top-card-header-action" id="refresh-status-maquinas">Atualizar</button>
             </div>
+            <div class="top-card-content">
+                <div class="text-center mb-3">
+                    <div class="display-4 text-primary">-</div>
+                    <p class="text-muted mb-0 small">Máquinas em operação</p>
+                </div>
+                <ul class="list-group list-group-flush lista-rolagem" id="machine-status-list">
+                    <!-- Lista de status das máquinas -->
+                </ul>
+                <div class="legenda-status">
+                    <span><span class="bolinha bg-warning"></span>Ocioso</span>
+                    <span><span class="bolinha bg-danger"></span>Parado</span>
+                    <span><span class="bolinha bg-success"></span>Em operação</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-card">
+            <div class="top-card-title">
+                <span><i class="fas fa-chart-pie"></i> Andamento da Carga</span>
+                <button class="btn btn-sm top-card-header-action" id="refresh-status-carga">Atualizar</button>
+            </div>
+            <div class="top-card-content justify-content-center">
+                <div class="text-center">
+                    <div id="percentual-carga" class="display-4 text-primary">Escolha uma data</div>
+                    <p class="text-muted mb-0">Concluído</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-card">
+            <div class="top-card-title">
+                <span><i class="fas fa-box-open"></i> Últimas 10 Cargas</span>
+                <button class="btn btn-sm top-card-header-action" id="refresh-pecas">Atualizar</button>
+            </div>
+            <div class="top-card-content">
+                <ul class="list-group lista-rolagem" id="ultimas-pecas-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="top-card painel-ordens-card" id="containerPlanejar">
+        <div class="top-card-title">
+            <span><i class="fas fa-list-ul"></i> Painel de Ordens Criadas</span>
+        </div>
+        <form id="filtro-form" class="mb-3 p-4 border rounded bg-light shadow-sm">
             <div class="row g-3 align-items-end">
                 <!-- Filtro por Data -->
                 <div class="col-md-4">
@@ -165,15 +153,9 @@
                     <button type="submit" class="btn btn-primary w-25" style="min-width: 200px;">
                         <i class="fas fa-filter me-1"></i> Filtrar
                     </button>
-
-                    <button type="button" class="btn btn-primary" id="btnQrCode" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
-                        <i class="bi bi-qr-code-scan"></i> Qr Code
-                    </button>
                 </div>
             </div>
         </form>
-
-        <!-- Tabela de Ordens Criadas -->
         <div id="ordens-container" class="table-responsive">
             <!-- Tabela de Ordens Criadas -->
             <div class="border rounded p-4 bg-white shadow-sm">
@@ -184,23 +166,36 @@
         </div>
     </div>
 
-    <!-- Container para Acompanhamento -->
-    <div class="mb-5">
-        <div class="row gy-4">
-            <div class="col-md-6">
-                <h4 class="text-center text-secondary">Processos em Andamento</h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="row row-cols-2 g-3 containerProcesso">
-                        <!-- Os cards são adicionados aqui dinamicamente -->
-                    </div>
+    <div class="process-board">
+        <div class="process-column">
+            <h3><span><i class="fas fa-play-circle" style="color: var(--dash-success);"></i> Processos em Andamento</span></h3>
+            <div class="process-column-body">
+                <div class="row row-cols-1 g-3 containerProcesso">
+                    <!-- Os cards são adicionados aqui dinamicamente -->
                 </div>
             </div>
-            <div class="col-md-6">
-                <h4 class="text-center text-secondary">Processos Interrompidos</h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="row row-cols-2 g-3 containerInterrompido">
-                        <!-- Os cards são adicionados aqui dinamicamente -->
-                    </div>
+        </div>
+        <div class="process-column">
+            <h3><span><i class="fas fa-pause-circle" style="color: var(--dash-danger);"></i> Processos Interrompidos</span></h3>
+            <div class="process-column-body">
+                <div class="row row-cols-1 g-3 containerInterrompido">
+                    <!-- Os cards são adicionados aqui dinamicamente -->
+                </div>
+            </div>
+        </div>
+        <div class="process-column">
+            <h3><span><i class="fas fa-step-forward" style="color: var(--dash-lilac);"></i> Próximo Processo</span></h3>
+            <div class="process-column-static">
+                <div class="process-filter-bar">
+                    <!-- igual à usinagem: cada operador escolhe a célula dele e vê o que está esperando -->
+                    <select class="form-select" id="filtro-celula-proximo-processo">
+                        <option value="">Qual sua célula? (todas)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="process-column-body">
+                <div class="row row-cols-1 g-3 containerAguardandoEtapa">
+                    <!-- Ordens aguardando o próximo processo (proximo-processo.js) -->
                 </div>
             </div>
         </div>
@@ -249,6 +244,8 @@
                         <option value="">Selecione um operador...</option>
                         <!-- Operadores serão carregados dinamicamente -->
                     </select>
+                    <div class="form-text">Pode escolher mais de um operador: cada um escolhido aparece abaixo.</div>
+                    <div id="operadoresIniciaisEscolhidos" class="d-flex flex-wrap gap-2 mt-2"></div>
                     <p id="descricaoBotaoListaOperadorInicial" style="font-size: 12px; text-align: end;">Não encontrou seu nome na lista? <a id="direcionarTodosOperadoresOperadorInicial" style="color: #0d6efd; cursor: pointer;">Clique aqui</a></p>
                     <p id="descricaoBotaoVoltarOperadorInicial" style="display: none; font-size: 12px; text-align: end;">Deseja voltar a lista anterior? <a id="botaoVoltarOperadoresMaquinaOperadorInicial" style="color: #0d6efd; cursor: pointer;">Voltar</a></p>
                 </div>            </div>

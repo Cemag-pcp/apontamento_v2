@@ -106,20 +106,24 @@ function buscarItensInspecao(pagina) {
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
-        if (params.size > 1) {
+        // Sem filtro o servidor devolve so os ultimos N dias (limitado_dias).
+        // Nesse caso esconde o total geral de pendentes: ele conta tambem as
+        // inspecoes antigas, que nao aparecem na lista.
+        qtdPendenteInspecao.style.display = items.limitado_dias ? 'none' : '';
+        if (items.limitado_dias) {
             qtdFiltradaInspecao.style.display = 'block';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} dos últimos ${items.limitado_dias} dias (filtre para ver os mais antigos)`;
         } else {
-            qtdFiltradaInspecao.style.display = 'none';
+            qtdFiltradaInspecao.style.display = params.size > 1 ? 'block' : 'none';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
         }
-
-        qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
 
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
+                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a>${item.parcial ? ' <span class="badge bg-warning text-dark" title="Inspeção salva parcialmente">Parcial</span>' : ''}</h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>
@@ -135,7 +139,7 @@ function buscarItensInspecao(pagina) {
                         data-qtd="${item.qtd_apontada}"
                         data-peca="${item.peca}"
                     class="btn btn-dark w-100 iniciar-inspecao">
-                    Iniciar Inspeção</button>
+                    ${item.parcial ? 'Continuar Inspeção' : 'Iniciar Inspeção'}</button>
                 </div>
             </div>`;
 

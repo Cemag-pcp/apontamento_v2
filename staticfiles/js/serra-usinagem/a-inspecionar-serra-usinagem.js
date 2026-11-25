@@ -21,6 +21,20 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Inicializar contagem de conformidades
     updateConformityCounts();
+
+    // Quantidade a inspecionar editável (ordem em produção): reajusta as linhas das tabelas de medição
+    document.getElementById('pecasProduzidas').addEventListener('change', function () {
+        // Não deixa ficar abaixo das amostras já salvas (as linhas delas sumiriam da tabela)
+        const minimo = parseInt(this.min, 10) || 1;
+        const qtd = parseInt(this.value, 10);
+        if (!qtd || qtd < minimo) {
+            this.value = minimo;
+        }
+        if (typeof window.syncMeasurementRowsSerraUsinagem === 'function') {
+            const linhasAtuais = parseInt(document.getElementById('measurementRowsCount')?.value, 10) || 1;
+            window.syncMeasurementRowsSerraUsinagem(Math.max(linhasAtuais, Math.min(parseInt(this.value, 10), 3)), true);
+        }
+    });
 });
 
 document.getElementById("btn-filtrar-inspecao-serra-usinagem").addEventListener("click", (event) => {
@@ -157,6 +171,24 @@ function buscarItensInspecao(pagina) {
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
+            const emAndamento = item.status === "Em andamento";
+            const statusTexto = emAndamento
+                ? `Parcial (${item.amostras_feitas}/${item.amostras_exigidas} amostras)`
+                : item.status;
+            const badge100 = item.inspecao_completa
+                ? '<p class="status-badge status-aprovado mt-1" style="font-size:13px" title="Inspeção 100% marcada">100%</p>'
+                : '';
+            // inspeção aberta no início da ordem: operador ainda produzindo (inspeção em tempo real)
+            const badgeProducao = item.em_producao
+                ? '<p class="status-badge status-entregue mt-1" style="font-size:13px" title="Ordem iniciada pelo operador, ainda não finalizada">Em produção</p>'
+                : '';
+            let linhaQuantidade = item.em_producao
+                ? `<strong>🔢 Quantidade Planejada:</strong> ${item.qtd_planejada} <small class="text-muted">(em produção)</small>`
+                : `<strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}`;
+            if (item.em_producao && item.qtd_inspecionar) {
+                linhaQuantidade += `<br><strong>🔍 Quantidade a Inspecionar:</strong> ${item.qtd_inspecionar}`;
+            }
+            const qtdReferencia = item.qtd_apontada || item.qtd_inspecionar || item.qtd_planejada;
 
             const cards = `
             <div class="col-md-4 mb-4">
@@ -164,25 +196,28 @@ function buscarItensInspecao(pagina) {
                     <div class="d-flex justify-content-between">
                         <h5 style="width:70%;"> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                         <div class="text-center">
-                            <p class="status-badge status-${status[item.status]}" style="font-size:13px">${item.status}</p>
+                            <p class="status-badge status-${status[item.status]}" style="font-size:13px">${statusTexto}</p>
+                            ${badge100}
+                            ${badgeProducao}
                         </div>
                     </div>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>
                         <strong>⚙️ Máquina:</strong> ${item.maquina}<br>
-                        <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
-                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
+                        ${linhaQuantidade}<br>
+                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador || '-'}
                     </p>
                     <hr>
-                    <button 
+                    <button
                         data-id="${item.id}"
                         data-data="${item.data}"
-                        data-qtd="${item.qtd_apontada}"
+                        data-qtd="${qtdReferencia}"
+                        data-em-producao="${item.em_producao ? 'true' : 'false'}"
                         data-peca="${item.peca}"
                         data-maquina="${item.maquina}"
                     class="btn btn-dark w-100 iniciar-inspecao" id="openModalButton">
-                    Iniciar Inspeção</button>
+                    ${emAndamento ? 'Continuar Inspeção' : 'Iniciar Inspeção'}</button>
                 </div>
             </div>`;
 
@@ -214,7 +249,8 @@ function buscarItensInspecao(pagina) {
                     const itemQtd = this.getAttribute('data-qtd');
                     const itemPeca = this.getAttribute('data-peca');
                     const itemMaquina = this.getAttribute('data-maquina');
-                    
+                    const itemEmProducao = this.getAttribute('data-em-producao') === 'true';
+
                     const modalInspecao = document.getElementById('inspectionModal');
                     
                     // Pegar a data atual formatada
@@ -232,8 +268,16 @@ function buscarItensInspecao(pagina) {
                     }
 
                     // Desabilitar campos para edição
+                    // Ordem em produção: o operador pode fazer mais que o planejado,
+                    // então o inspetor informa quantas peças vai inspecionar
+                    const inputPecas = modalInspecao.querySelector('#pecasProduzidas');
+                    inputPecas.min = '1';
+                    inputPecas.disabled = !itemEmProducao;
+                    inputPecas.readOnly = !itemEmProducao;
+                    modalInspecao.querySelector('label[for="pecasProduzidas"]').textContent = itemEmProducao
+                        ? 'Quantidade a inspecionar'
+                        : 'Peças Produzidas';
                     modalInspecao.querySelector('#maquina').disabled = true;
-                    modalInspecao.querySelector('#pecasProduzidas').disabled = true;
                     modalInspecao.querySelector('#dataInspecao').disabled = true;
                     modalInspecao.querySelector('#conjuntoName').disabled = true;
 
@@ -337,6 +381,8 @@ function preencherLinhasMedicao(dados) {
         const quantidadeAmostras = Object.keys(dadosTipo.amostras || {}).length;
         return Math.max(maiorQuantidade, quantidadeAmostras);
     }, 1);
+
+    document.getElementById('pecasProduzidas').min = String(totalLinhas);
 
     if (typeof window.syncMeasurementRowsSerraUsinagem === 'function') {
         window.syncMeasurementRowsSerraUsinagem(totalLinhas, false);
@@ -696,7 +742,7 @@ function getSelectedCauses(itemId) {
     return selectedCauses;
 }
 
-function validarFormulario() {
+function validarFormulario({ parcial = false } = {}) {
     // 1. Validação de inspetor
     const inspetor = document.getElementById('inspetor').value;
     if (inspetor === '') {
@@ -719,9 +765,9 @@ function validarFormulario() {
         return false;
     }
 
-    // 2. Validação inspeção 100%
+    // 2. Validação inspeção 100% (pode ficar para depois no salvamento parcial)
     const inspecao_total = document.getElementById("inspecao_total").value;
-    if (inspecao_total === '') {
+    if (inspecao_total === '' && !parcial) {
         Toast.fire({
             icon: "error",
             title: "Por favor, informe se será necessário inspeção 100%."

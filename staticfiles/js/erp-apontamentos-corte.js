@@ -1,9 +1,18 @@
+import {
+    abrirResolverAguardandoErp,
+    avisarSeAguardandoErp,
+    badgeAguardandoErp,
+    botaoAguardandoErp,
+    estaAguardandoErp,
+} from './erp-aguardando-confirmacao.js';
+
 const configEl = document.getElementById('erpApontamentosConfig');
 const apiUrl = configEl?.dataset?.apiUrl;
 const transferirUrlTemplate = configEl?.dataset?.transferirUrlTemplate;
 const apontarUrlTemplate = configEl?.dataset?.apontarUrlTemplate;
 const apontarBlocoUrl = configEl?.dataset?.apontarBlocoUrl;
 const csrfToken = configEl?.dataset?.csrfToken;
+const resolverUrlTemplate = configEl?.dataset?.resolverUrlTemplate;
 
 const form = document.getElementById('erpFiltrosForm');
 const tbody = document.getElementById('erpTabelaApontamentos');
@@ -154,7 +163,9 @@ function renderSelectCheckbox(row) {
 }
 
 function podeApontar(row) {
-    return String(row.transferencia_status || '').toLowerCase() === 'sucesso' && !Boolean(row.apontado);
+    return String(row.transferencia_status || '').toLowerCase() === 'sucesso'
+        && !Boolean(row.apontado)
+        && !estaAguardandoErp(row);
 }
 
 function renderActionButtons(row) {
@@ -170,7 +181,8 @@ function renderActionButtons(row) {
             <i class="fas fa-right-left"></i>
         </button>
     `;
-    const apontarButton = transferido && !apontado ? `
+    const aguardandoButton = estaAguardandoErp(row) ? botaoAguardandoErp(escapeAttrJson(row)) : '';
+    const apontarButton = transferido && !apontado && !aguardandoButton ? `
         <button type="button"
                 class="btn btn-sm btn-outline-primary btn-erp-apontar-corte"
                 title="Apontar"
@@ -183,6 +195,7 @@ function renderActionButtons(row) {
     return `
         <div class="d-inline-flex gap-1">
             ${transferButton}
+            ${aguardandoButton}
             ${apontarButton}
             ${erro ? `
                 <button type="button"
@@ -198,6 +211,7 @@ function renderActionButtons(row) {
 }
 
 function badgeApontamento(row) {
+    if (estaAguardandoErp(row)) return badgeAguardandoErp();
     if (row.apontado) return '<span class="badge text-bg-success">Apontado</span>';
     if (row.erro_apontamento) return '<span class="badge text-bg-danger">Erro</span>';
     return '<span class="badge text-bg-light text-dark">Pendente</span>';
@@ -380,6 +394,22 @@ function escapeAttrJson(value) {
 }
 
 function bindActionButtonsWithin(container) {
+    container.querySelectorAll('.btn-erp-aguardando').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            try {
+                const row = JSON.parse(btn.getAttribute('data-row'));
+                abrirResolverAguardandoErp(row, {
+                    resolverUrlTemplate,
+                    csrfToken,
+                    descricao: `Ordem ${row.ordem || '-'} | Peça ${formatPecaCodigo(row.peca || '-')} | Qtd. boa ${formatNumber(row.qtd_boa)}`,
+                    onResolvido: () => loadPage(state.page || 1),
+                });
+            } catch (error) {
+                console.error(error);
+            }
+        });
+    });
+
     container.querySelectorAll('.btn-erro-apontamento-corte').forEach((btn) => {
         btn.addEventListener('click', () => {
             openErroModal(btn.getAttribute('data-erro') || '');
@@ -762,6 +792,13 @@ async function confirmarApontamentoSelecionado(tipoApontamento = 'api') {
 
         const payload = await response.json();
         if (!response.ok || payload.status !== 'success') {
+            // ERP demorou (pode ter gravado) ou item já aguardando confirmação: aviso, não erro
+            if (payload?.aguardando_confirmacao_erp) {
+                modalConfirmarApontamentoCorteInstance?.hide();
+                avisarSeAguardandoErp(payload);
+                await loadPage(state.page || 1);
+                return;
+            }
             throw new Error(payload.description || payload.message || 'Falha ao confirmar apontamento.');
         }
 
@@ -825,6 +862,15 @@ async function confirmarApontamentoEmBloco(tipoApontamento = 'api') {
         const payload = await response.json();
         const sucessos = payload.sucessos || [];
         const erros = payload.erros || [];
+        if (payload?.aguardando_confirmacao_erp) {
+            // ERP demorou com o bloco inteiro: todos ficam aguardando conferência
+            modalApontamentoEmBlocoInstance?.hide();
+            avisarSeAguardandoErp(payload);
+            apontamentosSelecionados.clear();
+            updateBulkButton();
+            await loadPage(state.page || 1);
+            return;
+        }
         if (!response.ok && !sucessos.length) {
             throw new Error(payload.message || 'Falha ao confirmar apontamento em bloco.');
         }

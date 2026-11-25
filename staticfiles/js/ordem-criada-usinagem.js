@@ -1122,13 +1122,23 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
             .then(async (response) => {
                 const data = await response.json();
 
+                // Trava: a mesma peça está numa ordem interrompida
+                if (response.status === 409 && data.interrompidas) {
+                    modal.hide();
+                    await perguntarReiniciarInterrompida(data.interrompidas, maquinaName);
+                    atualizarTelasAposIniciar();
+                    return null;
+                }
+
                 if (!response.ok) {
                     throw new Error(data.error || 'Erro ao iniciar a ordem.');
                 }
 
                 return data; // Retorna os dados para o próximo `.then`
             })
-            .then(() => {
+            .then((data) => {
+                if (!data) return;
+
                 Swal.fire({
                     icon: 'success',
                     title: 'Sucesso',
@@ -1136,23 +1146,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 });
 
                 modal.hide();
-
-                // Atualiza a interface
-                const containerIniciado = document.querySelector('.containerProcesso');
-                carregarOrdensIniciadas(containerIniciado);
-
-                // Recarrega os dados chamando a função de carregamento
-                if (document.getElementById('ordens-container') === null) {
-                    return;
-                } else {
-                    document.getElementById('ordens-container').innerHTML = '';
-                }
-                resetarCardsInicial();
-
-                fetchStatusMaquinas();
-                // fetchUltimasPecasProduzidas();
-                fetchContagemStatusOrdens();
-    
+                atualizarTelasAposIniciar();
             })
             .catch((error) => {
                 Swal.fire({
@@ -1160,8 +1154,108 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                     title: 'Erro',
                     text: error.message,
                 });
+                // o card foi tirado da lista antes do envio: recarrega
+                atualizarTelasAposIniciar();
             });
     });
+}
+
+// Recarrega as listas depois de iniciar (ou não) uma ordem
+function atualizarTelasAposIniciar() {
+    const containerIniciado = document.querySelector('.containerProcesso');
+    if (containerIniciado) carregarOrdensIniciadas(containerIniciado);
+
+    const containerInterrompido = document.querySelector('.containerInterrompido');
+    if (containerInterrompido) carregarOrdensInterrompidas(containerInterrompido);
+
+    if (document.getElementById('ordens-container') === null) {
+        return;
+    }
+    document.getElementById('ordens-container').innerHTML = '';
+    resetarCardsInicial();
+
+    fetchStatusMaquinas();
+    fetchContagemStatusOrdens();
+}
+
+// Já existe ordem interrompida com a mesma peça: avisa e pergunta se
+// reinicia aquela (na máquina escolhida no modal). Sim = reinicia na hora;
+// Não = nenhuma ordem é iniciada. Devolve true se reiniciou.
+async function perguntarReiniciarInterrompida(interrompidas, maquinaEscolhida) {
+    const escapar = (texto) => {
+        const div = document.createElement('div');
+        div.textContent = texto ?? '';
+        return div.innerHTML;
+    };
+    const descricao = (o) => `Ordem <strong>#${escapar(String(o.ordem))}</strong>`
+        + (o.maquina ? ` - ${escapar(o.maquina)}` : '')
+        + (o.motivo ? `<br><small class="text-muted">Motivo: ${escapar(o.motivo)}${o.interrompida_em ? ` (${escapar(o.interrompida_em)})` : ''}</small>` : '');
+
+    const varias = interrompidas.length > 1;
+    const resposta = await Swal.fire({
+        icon: 'warning',
+        title: 'Peça com ordem interrompida',
+        html: `<p>Já existe ${varias ? 'ordem interrompida' : 'uma ordem interrompida'} com a peça
+                  <strong>${escapar(interrompidas[0].peca)}</strong>:</p>
+               ${varias ? '' : `<p>${descricao(interrompidas[0])}</p>`}
+               <p class="mb-0">Deseja reiniciar ${varias ? 'uma delas' : 'essa ordem'} em vez de iniciar uma nova?</p>`,
+        input: varias ? 'select' : undefined,
+        inputOptions: varias
+            ? Object.fromEntries(interrompidas.map((o) => [o.id, `#${o.ordem}${o.maquina ? ` - ${o.maquina}` : ''}${o.motivo ? ` (${o.motivo})` : ''}`]))
+            : undefined,
+        inputValue: varias ? String(interrompidas[0].id) : undefined,
+        showCancelButton: true,
+        confirmButtonText: 'Sim, reiniciar',
+        cancelButtonText: 'Não',
+        reverseButtons: true,
+    });
+
+    if (!resposta.isConfirmed) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Ordem não iniciada',
+            text: 'Retorne a ordem interrompida para continuar a produção desta peça.',
+        });
+        return false;
+    }
+
+    const escolhida = varias
+        ? interrompidas.find((o) => String(o.id) === String(resposta.value))
+        : interrompidas[0];
+
+    Swal.fire({
+        title: 'Reiniciando ordem...',
+        text: 'Por favor, aguarde.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+    });
+
+    try {
+        const response = await fetch(`/usinagem/api/ordens/atualizar-status/`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                ordem_id: escolhida.id,
+                status: 'iniciada',
+                maquina_nome: maquinaEscolhida || escolhida.maquina_id,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken(),
+            },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Erro ao reiniciar a ordem.');
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Sucesso',
+            text: `Ordem #${escolhida.ordem} reiniciada.`,
+        });
+        return true;
+    } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Erro', text: error.message });
+        return false;
+    }
 }
 
 // Modal para "Parcial"

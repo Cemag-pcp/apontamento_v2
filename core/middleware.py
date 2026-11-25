@@ -103,6 +103,10 @@ class RotaAccessMiddleware:
         if path.startswith("cargas/acompanhamento/"):
             return self.get_response(request)
 
+        # link público da contagem do inventário (o token no link é a chave)
+        if path.startswith("inventario/contagem/"):
+            return self.get_response(request)
+
         if path in PUBLIC_PATHS:
             return self.get_response(request)
         

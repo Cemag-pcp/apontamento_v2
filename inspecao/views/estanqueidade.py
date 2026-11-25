@@ -195,7 +195,7 @@ def inspecao_tanque(request):
     users = Profile.objects.filter(
         tipo_acesso="inspetor", permissoes__nome="inspecao/tanque"
     )
-    causas = Causas.objects.filter(setor="montagem")
+    causas = Causas.objects.filter(setor="montagem", excluida=False)
 
     lista_inspetores = [
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
@@ -454,6 +454,20 @@ def get_itens_inspecionados_tubos_cilindros(request):
                 Q(inspecao_estanqueidade__peca__codigo__icontains=pesquisa_filtrada) |
                 Q(inspecao_estanqueidade__peca__descricao__icontains=pesquisa_filtrada)
             )
+
+    # Filtro "Reinspecionadas": so as que passaram pela reinspecao de fato -
+    # concluida e com execucao de reinspecao (num_execucao > 0). Fica de fora a
+    # reinspecao fechada automaticamente quando a peca vai pra sucata.
+    if request.GET.get("reinspecionadas") == "1":
+        base_query = base_query.filter(
+            inspecao_estanqueidade__in=ReinspecaoEstanqueidade.objects.filter(
+                reinspecionado=True
+            ).values("inspecao")
+        ).filter(
+            inspecao_estanqueidade__in=DadosExecucaoInspecaoEstanqueidade.objects.filter(
+                num_execucao__gt=0
+            ).values("inspecao_estanqueidade")
+        )
 
     # Usar Window Function para encontrar a última execução de cada inspeção
     # Esta é a parte principal da otimização. Criamos uma "janela" para cada inspeção,
@@ -1459,6 +1473,18 @@ def get_itens_inspecionados_tanque(request):
         elif "nao_conforme" in status_teste_filtrado:
             # Filtrar apenas testes não conformes
             datas = datas.filter(id__in=ids_com_nao_conformidade_teste)
+
+    # Filtro "Reinspecionadas": so as que passaram pela reinspecao de fato -
+    # concluida e com execucao de reinspecao (num_execucao > 0). Fica de fora a
+    # reinspecao fechada automaticamente quando a peca vai pra sucata.
+    if request.GET.get("reinspecionadas") == "1":
+        datas = datas.filter(
+            id__in=ReinspecaoEstanqueidade.objects.filter(reinspecionado=True).values("inspecao")
+        ).filter(
+            id__in=DadosExecucaoInspecaoEstanqueidade.objects.filter(
+                num_execucao__gt=0
+            ).values("inspecao_estanqueidade")
+        )
 
     datas = datas.select_related("peca").order_by("-id")
 

@@ -1,3 +1,22 @@
+import { confirmarInicioSeProximoProcesso, criarProximoProcesso } from './proximo-processo.js';
+import { ativarVariosOperadores, limparOperadores, operadoresEscolhidos } from './operadores-multiplos.js';
+// "Próximo processo" (como na usinagem): passa a ordem e o próximo operador inicia
+function filtrosAtuaisProximoProcesso() {
+    return {
+        data_carga: document.getElementById('filtro-data-carga')?.value || '',
+        setor: document.getElementById('filtro-setor')?.value || '',
+    };
+}
+const proximoProcesso = criarProximoProcesso({
+    base: '/solda',
+    container: '.containerAguardandoEtapa',
+    aoAtualizar: () => {
+        const filtros = filtrosAtuaisProximoProcesso();
+        carregarOrdensIniciadas(filtros);
+        proximoProcesso.carregar(filtros);
+    },
+});
+
 function authFetch(input, init) {
     return fetch(input, init).then(response => {
         if (response.status === 401) {
@@ -80,6 +99,9 @@ export const loadOrdens = (container, filtros = {}) => {
                             case "interrompida":
                                 badgeClass = "badge bg-danger"; // Vermelho
                                 break;
+                            case "agua_prox_proc":
+                                badgeClass = "badge bg-prox-processo"; // Lilás
+                                break;
                             default:
                                 badgeClass = "badge bg-secondary"; // Cinza para status desconhecidos
                         }
@@ -91,13 +113,14 @@ export const loadOrdens = (container, filtros = {}) => {
                                 ${truncateText(ordem.peca, 100)}
                                 </a>
                             </td>
-                            <td data-label="Status"><span class="${badgeClass}">${ordem.ordem__status_atual.replace("_", " ")}</span></td>
+                            <td data-label="Status"><span class="${badgeClass}">${ordem.ordem__status_atual === 'agua_prox_proc' ? 'próximo processo' : ordem.ordem__status_atual.replace("_", " ")}</span></td>
                             <td data-label="Qtd. a Fazer">${ordem.restante}</td>
                             <td data-label="Qtd. Feita">${ordem.total_boa}</td>
                             <td data-label="Ação">
                                 <button 
                                 class="btn btn-sm btn-primary btn-start"
                                 data-ordem-id="${ordem.ordem}"
+                                data-status="${ordem.ordem__status_atual}"
                                 data-maquina-nome="${ordem.ordem__maquina__nome}">
                                 Iniciar
                                 </button>
@@ -164,7 +187,7 @@ function truncateText(text, maxLength) {
 }
 
 // Usando delegação de eventos para capturar o clique no botão "Iniciar"
-document.addEventListener('click', function (e) {
+document.addEventListener('click', async function (e) {
   const btn = e.target.closest('.btn-start'); // garante que é o botão, mesmo clicando no texto/ícone
   if (!btn) return;
 
@@ -175,6 +198,9 @@ document.addEventListener('click', function (e) {
     console.error("Ordem ID não encontrado no botão.");
     return;
   }
+
+  // ordem em "Próximo Processo": confirma antes de iniciar
+  if (!(await confirmarInicioSeProximoProcesso(btn.dataset.status, ordemId))) return;
 
   mostrarModalIniciar(ordemId, maquinaNome);
 });
@@ -206,7 +232,8 @@ function iniciarOrdem(ordemId, operadorId) {
         body: JSON.stringify({
             status: "iniciada",
             ordem_id: ordemId,
-            operador_inicio: operadorId
+            operador_inicio: operadorId[0],
+            operadores_inicio: operadorId
         })
     })
     .then(response => {
@@ -286,6 +313,7 @@ export function carregarOrdensIniciadas(filtros = {}) {
                     <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar">
                         <i class="fa fa-check"></i>
                     </button>
+                    ${proximoProcesso.botaoHtml()}
                 `;
 
                 card.innerHTML = `
@@ -348,6 +376,7 @@ export function carregarOrdensIniciadas(filtros = {}) {
                     });
                 }
 
+                proximoProcesso.ligarBotao(card, ordem);
                 container.appendChild(card);
 
                 iniciarContador(ordem.ordem_id, ordem.ultima_atualizacao)
@@ -358,6 +387,7 @@ export function carregarOrdensIniciadas(filtros = {}) {
 };
 
 export function carregarOrdensInterrompidas(filtros = {}) {
+    proximoProcesso.carregar(filtros);
     const container = document.querySelector('.containerInterrompido');
     // container.innerHTML = `
     // <div class="spinner-border text-dark" role="status">
@@ -757,6 +787,8 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
 function mostrarModalIniciar(ordemId, maquina) {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal'));
 
+    limparOperadores('operadoresIniciaisEscolhidos');
+
     const operadorSelect = document.getElementById('operadorInicial');
     const labelOperadores = document.getElementById('labelOperadores');
 
@@ -1030,33 +1062,14 @@ document.getElementById('confirmStartButton').addEventListener('click', function
     const operadorInicio = document.getElementById('operadorInicial');
     const todosOperadorInicio = document.getElementById('todosOperadorInicial');
 
-    // Determinar qual select está ativo e obter o valor do operador
-    let operadorId;
-    if (operadorInicio.style.display !== 'none' && operadorInicio.getAttribute('data-active') === 'true') {
-        if (!operadorInicio.value || operadorInicio.value === "") {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção',
-                text: 'Por favor, selecione um operador da máquina.'
-            });
-            return;
-        }
-        operadorId = operadorInicio.value;
-    } else if (todosOperadorInicio.style.display !== 'none' && todosOperadorInicio.getAttribute('data-active') === 'true') {
-        if (!todosOperadorInicio.value || todosOperadorInicio.value === "") {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção',
-                text: 'Por favor, selecione um operador da lista geral.'
-            });
-            return;
-        }
-        operadorId = todosOperadorInicio.value;
-    } else {
+    // um ou mais operadores (etiquetas em operadoresIniciaisEscolhidos)
+    const operadorId = operadoresEscolhidos('operadoresIniciaisEscolhidos');
+    if (!operadorId.length) {
+        this.disabled = false;
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
-            text: 'Por favor, selecione um operador válido.'
+            text: 'Selecione ao menos um operador.'
         });
         return;
     }
@@ -1865,4 +1878,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mostrarModalPararMaquina();
     });
 });
+
+
+// selects de operador do modal Iniciar: escolha de um ou mais
+ativarVariosOperadores(['operadorInicial', 'todosOperadorInicial'], 'operadoresIniciaisEscolhidos');
 

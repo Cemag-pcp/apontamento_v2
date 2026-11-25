@@ -7,60 +7,75 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     buttonInspecionarMontagem.disabled = true;
     buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "flex";
 
+    function cancelarEnvio(mensagem) {
+        Swal.fire({ icon: 'error', title: mensagem });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+    }
+
     // Criar um objeto FormData para enviar os arquivos
     const formData = new FormData(this); // Usar o formulário diretamente
 
-    // Adicionar os dados básicos ao FormData
-    const naoConformidade = document.getElementById("nao-conformidade-reinspecao-montagem").value;
-    formData.append("nao-conformidade-reinspecao-montagem", naoConformidade);
+    const qtdReinspecao = document.getElementById("qtd-reinspecao-montagem").value;
 
-    let totalQuantidadeInput = 0;
+    const cardsUnidades = document.querySelectorAll("#unidades-checklist-reinspecao-montagem .unidade-checklist-card");
+    const totalCausas = totalItensChecklistMontagem();
 
-    // Adicionar causas, quantidades e imagens ao FormData
-    const selectContainerInspecao = document.querySelectorAll(".selectContainerReinspecao");
-    selectContainerInspecao.forEach((container, index) => {
-        const causaSelect = container.querySelector('select');
-        const quantidadeInput = container.querySelector('input[type="number"]');
-        const imagensInput = container.querySelector('input[type="file"]');
-        totalQuantidadeInput += parseFloat(quantidadeInput.value);
-        console.log(totalQuantidadeInput)
-
-        // Adicionar causas
-        Array.from(causaSelect.selectedOptions).forEach((option, i) => {
-            formData.append(`causas_reinspecao_${index + 1}[${i}]`, option.value);
-        });
-
-        // Adicionar quantidade
-        formData.append(`quantidade_reinspecao_${index + 1}`, quantidadeInput.value);
-
-        // Adicionar arquivos de imagem
-        Array.from(imagensInput.files).forEach((file, i) => {
-            formData.append(`imagens_reinspecao_${index + 1}[${i}]`, file); // Anexar o arquivo diretamente
-        });
-    });
-
-    const naoConformidadeNum = parseFloat(naoConformidade);
-
-    if (naoConformidadeNum !== 0) {
-        const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
-            ? 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"'
-            : naoConformidadeNum < 0
-            ? 'Verifique se o "N° total de conformidades" está com o valor correto'
-            : null;
-    
-        if (erroMensagem) {
-            Swal.fire({
-                icon: 'error',
-                title: erroMensagem,
-            });
-    
-            buttonInspecionarMontagem.disabled = false;
-            buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
-            return;
-        }
+    if (cardsUnidades.length !== parseInt(qtdReinspecao, 10)) {
+        cancelarEnvio('Erro ao montar o checklist das unidades. Reabra o modal e tente novamente.');
+        return;
     }
 
-    formData.append("quantidade-total-causas", selectContainerInspecao.length)
+    const existeUnidadeIncompleta = Array.from(cardsUnidades).some((card) => {
+        const respondidos = card.querySelectorAll('.causa-status-ok:checked, .causa-status-nok:checked').length;
+        return respondidos < totalCausas;
+    });
+
+    if (existeUnidadeIncompleta) {
+        cancelarEnvio('Complete o checklist de todas as unidades reinspecionadas antes de enviar.');
+        return;
+    }
+
+    // validarFalhasChecklistMontagem / validarImagensNaoConformidadeMontagem vêm de modal-inspecionar.js
+    const semFalha = validarFalhasChecklistMontagem(document.getElementById("unidades-checklist-reinspecao-montagem"));
+    if (semFalha.length > 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Escolha a falha',
+            html: 'Selecione ao menos uma falha em:<br>' + semFalha.join('<br>'),
+        });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+        return;
+    }
+
+    const semFoto = validarImagensNaoConformidadeMontagem(document.getElementById("unidades-checklist-reinspecao-montagem"));
+    if (semFoto.length > 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Foto obrigatória na não conformidade',
+            html: 'Anexe ao menos uma foto em:<br>' + semFoto.join('<br>'),
+        });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+        return;
+    }
+
+    // Cada grupo "Ñ OK" vira um bloco com as falhas escolhidas (agregarNaoConformidadesMontagem)
+    const blocos = agregarNaoConformidadesMontagem(document.getElementById("unidades-checklist-reinspecao-montagem"));
+    let totalBlocos = 0;
+    blocos.forEach((bloco) => {
+        totalBlocos += 1;
+        bloco.causasIds.forEach((causaId) => formData.append(`causas_reinspecao_${totalBlocos}`, causaId));
+        formData.append(`quantidade_reinspecao_${totalBlocos}`, bloco.quantidade);
+        bloco.imagens.forEach((file) => formData.append(`imagens_reinspecao_${totalBlocos}`, file));
+    });
+
+    formData.append("quantidade-total-causas", totalBlocos);
+    // Campos desabilitados (conformidade/nao-conformidade sao calculados a
+    // partir do checklist) nao entram automaticamente no FormData.
+    formData.append("conformidade-reinspecao-montagem", document.getElementById("conformidade-reinspecao-montagem").value);
+    formData.append("nao-conformidade-reinspecao-montagem", document.getElementById("nao-conformidade-reinspecao-montagem").value);
 
     // Enviar os dados para o backend
     fetch("/inspecao/api/envio-reinspecao-montagem/", {
@@ -103,7 +118,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     })
     .catch(error => {
         console.error(error);
-    
+
         Swal.fire({
             icon: 'error',
             title: 'Erro no envio da inspeção',

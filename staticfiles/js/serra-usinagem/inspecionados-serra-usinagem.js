@@ -120,6 +120,10 @@ function buscarItensInspecionados(pagina) {
         itensFiltradosInspetor.style.display = "none";
     }
 
+    // Somente inspecoes que passaram pela reinspecao
+    if (document.getElementById('filter-itens-reinspecionadas')?.checked) {
+        params.append("reinspecionadas", "1");
+    }
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
     fetch(`/inspecao/api/itens-inspecionados-serra-usinagem/?${params.toString()}`, {
@@ -156,24 +160,6 @@ function buscarItensInspecionados(pagina) {
                 "Amarelo": "yellow", "Cinza": "gray"
             };
 
-            let iconeNaoConformidade;
-
-            if (item.possui_nao_conformidade) {
-            iconeNaoConformidade = `
-                <span class="badge rounded-pill bg-danger">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                Não conformidade
-                </span>
-            `;
-            } else {
-            iconeNaoConformidade = `
-                <span class="badge rounded-pill bg-success">
-                <i class="bi bi-check-circle-fill me-1"></i>
-                Conforme
-                </span>
-            `;
-            }
-
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
@@ -182,14 +168,21 @@ function buscarItensInspecionados(pagina) {
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>📍 Máquina:</strong> ${item.maquina}<br>
+                        <strong>🔢 Qtd Produzida:</strong> ${item.qtd_apontada}<br>
+                        <strong>🔍 Qtd Inspecionada:</strong> ${item.qtd_inspecionada}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
-                    <div class="d-flex justify-content-between">
-                        <div class="d-flex align-items-baseline gap-2">
-                            ${iconeNaoConformidade}
-                        </div>
-                        <button 
+                    <div class="d-flex justify-content-center gap-3 mb-2">
+                        <span class="text-success" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-check-circle-fill"></i> Conforme: ${item.conformidade}
+                        </span>
+                        <span class="text-danger" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-x-circle-fill"></i> Não conforme: ${item.nao_conformidade}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button
                             data-id="${item.id}"
                             data-data="${item.data}"
                             data-peca="${item.peca}"
@@ -198,7 +191,7 @@ function buscarItensInspecionados(pagina) {
                             data-nao-conformidade="${item.nao_conformidade}"
                             data-conformidade="${item.conformidade}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
+                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>

@@ -71,7 +71,7 @@ def _build_query_params(start_date: date, end_date: date, skip: int) -> dict:
         "Deal("
         "$select=Id,CreateDate,Quotes;"
         "$expand=Quotes("
-        "$select=Id,ContactName,Products,Notes;"
+        "$select=Id,ContactName,Products,Notes,QuoteNumber,ReviewNumber,LastReview,Date;"
         "$filter=ContactName ne 'TESTE - APP CEMAG';"
         "$expand=Products("
         "$expand="
@@ -111,7 +111,7 @@ def _build_lookup_query_params(skip: int, deal_id: str | None = None, chave_pedi
         "Deal("
         "$select=Id,CreateDate,Quotes;"
         "$expand=Quotes("
-        "$select=Id,ContactName,Products,Notes;"
+        "$select=Id,ContactName,Products,Notes,QuoteNumber,ReviewNumber,LastReview,Date;"
         "$filter=ContactName ne 'TESTE - APP CEMAG';"
         "$expand=Products("
         "$expand="
@@ -160,6 +160,19 @@ def _format_create_date(raw_value: str | None) -> str:
     return created_at.strftime('%d/%m/%Y %H:%M:%S')
 
 
+def _quotes_vigentes(quotes: list[dict]) -> list[dict]:
+    """
+    Uma proposta revisada aparece como varias quotes (ReviewNumber 0, 1, 2...),
+    cada uma com seus itens e observacao. So a revisao mais recente vale: a
+    Ploomes marca LastReview=true nela (e tambem na quote sem revisao).
+    Se sobrar mais de uma, fica a de data mais recente.
+    """
+    if len(quotes) <= 1:
+        return quotes
+    candidatas = [q for q in quotes if q.get('LastReview')] or quotes
+    return [max(candidatas, key=lambda q: (q.get('Date') or '', q.get('ReviewNumber') or 0, q.get('Id') or 0))]
+
+
 def _parse_order_item(order_item: dict) -> list[ConfPedidoItem]:
     deal = order_item.get('Deal') or {}
     quotes = deal.get('Quotes') or []
@@ -171,7 +184,7 @@ def _parse_order_item(order_item: dict) -> list[ConfPedidoItem]:
     deal_id = str(deal.get('Id') or 'N/D')
 
     items: list[ConfPedidoItem] = []
-    for quote in quotes:
+    for quote in _quotes_vigentes(quotes):
         quote_id = quote.get('Id')
         contato = quote.get('ContactName') or 'N/D'
         observacao = quote.get('Notes') or ''

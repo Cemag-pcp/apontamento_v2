@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/apontamentos-peca/usinagem', views.api_apontamentos_peca, name='api_apontamentos_peca'),
     path('api/erp/apontamentos/', views.api_erp_apontamentos_usinagem, name='api_erp_apontamentos_usinagem'),
     path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_usinagem, name='api_erp_apontar_item_usinagem'),
+    path('api/erp/apontamentos/<int:pk>/resolver-erp/', views.api_erp_resolver_aguardando_usinagem, name='api_erp_resolver_aguardando_usinagem'),
 
 ]
 

@@ -200,25 +200,58 @@ function salvarParcialInspecao() {
         quantidadeItensNaoConformidade: itensNaoConformidade.length
     };
 
-    localStorage.setItem(getChaveRascunhoInspecao(idInspecao), JSON.stringify(rascunho));
-    atualizarFlagParcialCard(idInspecao, true);
-    Toast.fire({ icon: "success", title: "Rascunho salvo com sucesso." });
+    // Grava no servidor, pra continuar em outro aparelho (PC/tablet)
+    fetch(urlRascunhoInspecao(idInspecao), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+        body: JSON.stringify(rascunho)
+    })
+        .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || "Falha ao salvar o rascunho.");
+            // copia antiga só deste navegador: o servidor passa a valer
+            localStorage.removeItem(getChaveRascunhoInspecao(idInspecao));
+            atualizarFlagParcialCard(idInspecao, true);
+            Toast.fire({ icon: "success", title: "Rascunho salvo com sucesso." });
+        })
+        .catch((error) => {
+            Toast.fire({ icon: "error", title: error.message });
+        });
+}
+
+function urlRascunhoInspecao(idInspecao) {
+    return `/inspecao/api/rascunho-inspecao-estamparia/${idInspecao}/`;
 }
 
 function carregarRascunhoParcialInspecao(idInspecao) {
     if (!idInspecao) return;
 
-    const bruto = localStorage.getItem(getChaveRascunhoInspecao(idInspecao));
-    if (!bruto) return;
+    fetch(urlRascunhoInspecao(idInspecao))
+        .then((response) => (response.ok ? response.json() : { existe: false }))
+        .catch(() => ({ existe: false }))
+        .then((resposta) => {
+            // o modal pode ter sido aberto em outra inspeção enquanto buscava
+            if (document.getElementById("id-inspecao").value !== String(idInspecao)) return;
 
-    let rascunho = null;
-    try {
-        rascunho = JSON.parse(bruto);
-    } catch (error) {
-        localStorage.removeItem(getChaveRascunhoInspecao(idInspecao));
-        return;
-    }
+            if (resposta.existe) {
+                aplicarRascunhoParcialInspecao(resposta.dados);
+                return;
+            }
+            // Rascunho antigo, salvo só no navegador antes do servidor guardar
+            const bruto = localStorage.getItem(getChaveRascunhoInspecao(idInspecao));
+            if (!bruto) return;
+            try {
+                aplicarRascunhoParcialInspecao(JSON.parse(bruto));
+            } catch (error) {
+                localStorage.removeItem(getChaveRascunhoInspecao(idInspecao));
+            }
+        });
+}
 
+function aplicarRascunhoParcialInspecao(rascunho) {
     if (!rascunho) return;
 
     if (Number.isInteger(rascunho.linhasMedicaoSolicitadas) && rascunho.linhasMedicaoSolicitadas > 0) {
@@ -405,22 +438,26 @@ function buscarItensInspecao(pagina) {
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
-        if (params.size > 1) {
+        // Sem filtro o servidor devolve so os ultimos N dias (limitado_dias).
+        // Nesse caso esconde o total geral de pendentes: ele conta tambem as
+        // inspecoes antigas, que nao aparecem na lista.
+        qtdPendenteInspecao.style.display = items.limitado_dias ? 'none' : '';
+        if (items.limitado_dias) {
             qtdFiltradaInspecao.style.display = 'block';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} dos últimos ${items.limitado_dias} dias (filtre para ver os mais antigos)`;
         } else {
-            qtdFiltradaInspecao.style.display = 'none';
+            qtdFiltradaInspecao.style.display = params.size > 1 ? 'block' : 'none';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
         }
 
-        qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
-
         items.dados.forEach(item => {
-            const existeRascunhoParcial = Boolean(localStorage.getItem(getChaveRascunhoInspecao(item.id)));
+            const existeRascunhoParcial = item.parcial || Boolean(localStorage.getItem(getChaveRascunhoInspecao(item.id)));
 
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3" data-card-inspecao-id="${item.id}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+                <div class="card p-3 h-100 d-flex flex-column" data-card-inspecao-id="${item.id}">
                     <h5 class="d-flex align-items-center gap-2 titulo-card-inspecao">
-                        <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a>
+                        <a class="text-truncate" style="min-width:0;" href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer" title="${item.peca}">${item.peca}</a>
                         ${existeRascunhoParcial ? '<span class="badge bg-warning text-dark flag-rascunho-parcial">Parcial</span>' : ''}
                     </h5>
                     <p>Inspecao #${item.id}</p>
@@ -431,13 +468,13 @@ function buscarItensInspecao(pagina) {
                         <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
                     </p>
                     <hr>
-                    <button 
+                    <button
                         data-id="${item.id}"
                         data-data="${item.data}"
                         data-qtd="${item.qtd_apontada}"
                         data-peca="${item.peca}"
                         data-maquina="${item.maquina}"
-                    class="btn btn-dark w-100 iniciar-inspecao" id="openModalButton">
+                    class="btn btn-dark w-100 iniciar-inspecao mt-auto" id="openModalButton">
                     Iniciar Inspeção</button>
                 </div>
             </div>`;

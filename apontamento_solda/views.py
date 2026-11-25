@@ -14,6 +14,7 @@ from datetime import datetime, date, timedelta
 import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
+from core.operadores import OperadorInvalido, nomes_operadores, operadores_do_corpo
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 from inspecao.models import Inspecao
@@ -158,6 +159,40 @@ def criar_ordem(request):
         traceback.print_exc()  # Log detalhado do erro no console
         return JsonResponse({'error': f'Erro inesperado: {str(e)}'}, status=500)
     
+def _ultimo_lote_proprio_solda(ordem):
+    """Lote atual da ordem (o que recebe interrupção/finalização). Lotes de
+    ordens paralelas, ao serem finalizados, passam para a principal mas
+    continuam ligados ao processo da paralela: ficam de fora daqui, senão o
+    "último lote" da principal seria o da paralela (id maior) e a
+    finalização sobrescreveria a quantidade dele."""
+    return (
+        PecasOrdem.objects.filter(ordem=ordem)
+        .filter(Q(processo_ordem__isnull=True) | Q(processo_ordem__ordem_id=ordem.id))
+        .order_by('id')
+        .last()
+    )
+
+
+def _encerrar_ordens_da_familia_solda(raiz, exceto_id=None):
+    """Quantidade da ordem completa: fecha a principal e as paralelas ainda
+    abertas, para ninguém ficar com uma ordem sem saldo na tela."""
+    abertas = (
+        Ordem.objects.select_for_update(of=('self',))
+        .filter(Q(pk=raiz.pk) | Q(ordem_pai=raiz))
+        .exclude(status_atual='finalizada')
+    )
+    if exceto_id:
+        abertas = abertas.exclude(pk=exceto_id)
+    for aberta in abertas:
+        processo_aberto = aberta.processos.filter(data_fim__isnull=True).first()
+        if processo_aberto:
+            processo_aberto.finalizar_atual()
+        OrdemProcesso.objects.create(ordem=aberta, status='finalizada', data_inicio=now(), data_fim=now())
+        aberta.status_atual = 'finalizada'
+        aberta.status_prioridade = 3
+        aberta.save()
+
+
 @csrf_exempt
 def atualizar_status_ordem(request):
     
@@ -208,241 +243,325 @@ def atualizar_status_ordem(request):
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
 
-        # Obtém a ordem ANTES da transação, para evitar falha na atomicidade
-        ordem = get_object_or_404(Ordem, pk=ordem_id)
+        # Trava a ordem durante toda a checagem de status + gravação: dois inícios
+        # ao mesmo tempo (dois tablets, tela + QR, nova tentativa da rede) ficam em
+        # fila; o segundo já vê a ordem "iniciada" e vira uma ordem paralela, em vez
+        # de abrir dois lotes na mesma ordem.
+        with transaction.atomic():
+            ordem = get_object_or_404(Ordem.objects.select_for_update(of=('self',)), pk=ordem_id)
 
-        # Validações básicas
-        if ordem.status_atual == status:
+            if status == 'iniciada':
+                if ordem.status_atual == 'interrompida':
+                    return JsonResponse({'error': 'Essa ordem está interrompida, retorne ela.'}, status=400)
+                if ordem.status_atual == 'finalizada':
+                    return JsonResponse({'error': 'Essa ordem já está finalizada. Atualize a página.'}, status=400)
+
+            # Validações básicas
+            if ordem.status_atual == status:
             
-            if ordem.status_atual == 'iniciada':
-                operador_inicio = body.get('operador_inicio', None)
+                if ordem.status_atual == 'iniciada':
+                    try:
+                        operadores_inicio = operadores_do_corpo(body, 'operadores_inicio', 'operador_inicio')
+                    except OperadorInvalido as exc:
+                        return JsonResponse({'error': str(exc)}, status=400)
+                    if not operadores_inicio:
+                        return JsonResponse({'error': 'Selecione ao menos um operador.'}, status=400)
+                    operador_inicio = operadores_inicio[0].id
 
-                # verifica se a quantidade restante para a ordem é maior q eu 1
-                # mas tem que coletar todas as ordems cuja ordem_pai seja a ordem atual
-                ordens_filhas = Ordem.objects.filter(Q(ordem_pai=ordem) | Q(id=ordem.id))
-                pecas_ordem = PecasOrdem.objects.filter(ordem__in=ordens_filhas)
-                qtd_planejada_total = pecas_ordem.aggregate(total_planejada=Coalesce(Sum('qtd_planejada'), Value(0), output_field=FloatField()))['total_planejada']
-                qtd_planejada_total = qtd_planejada_total / pecas_ordem.count()
+                    # verifica se a quantidade restante para a ordem é maior q eu 1
+                    # mas tem que coletar todas as ordems cuja ordem_pai seja a ordem atual
+                    ordens_filhas = Ordem.objects.filter(Q(ordem_pai=ordem) | Q(id=ordem.id))
+                    pecas_ordem = PecasOrdem.objects.filter(ordem__in=ordens_filhas)
+                    qtd_planejada_total = pecas_ordem.aggregate(total_planejada=Coalesce(Sum('qtd_planejada'), Value(0), output_field=FloatField()))['total_planejada']
+                    qtd_planejada_total = qtd_planejada_total / pecas_ordem.count()
 
-                qtd_boa_total = pecas_ordem.aggregate(total_boa=Coalesce(Sum('qtd_boa'), Value(0), output_field=FloatField()))['total_boa']
-                qtd_restante = qtd_planejada_total - qtd_boa_total
-                if qtd_restante <= 1:
-                    return JsonResponse({'error': f'Essa ordem já está iniciada e não possui quantidade restante suficiente para criar uma nova ordem. Atualize a página.'}, status=400)
+                    qtd_boa_total = pecas_ordem.aggregate(total_boa=Coalesce(Sum('qtd_boa'), Value(0), output_field=FloatField()))['total_boa']
+                    qtd_restante = qtd_planejada_total - qtd_boa_total
+                    if qtd_restante <= 1:
+                        return JsonResponse({'error': f'Essa ordem já está iniciada e não possui quantidade restante suficiente para criar uma nova ordem. Atualize a página.'}, status=400)
             
-                # criar nova ordem clone da ordem atual apenas alterando a coluna ordem e a coluna ordem_pai que será a referencia da própria ordem
-                nova_ordem = Ordem.objects.create(
-                    grupo_maquina=ordem.grupo_maquina,
-                    status_atual='iniciada',
-                    data_carga=ordem.data_carga,
-                    data_programacao=ordem.data_programacao,
-                    maquina=ordem.maquina,
-                    ordem_pai=ordem,
-                    obs=ordem.obs,
-                )
+                    # criar nova ordem clone da ordem atual apenas alterando a coluna ordem e a coluna ordem_pai que será a referencia da própria ordem
+                    nova_ordem = Ordem.objects.create(
+                        grupo_maquina=ordem.grupo_maquina,
+                        status_atual='iniciada',
+                        data_carga=ordem.data_carga,
+                        data_programacao=ordem.data_programacao,
+                        maquina=ordem.maquina,
+                        ordem_pai=ordem,
+                        obs=ordem.obs,
+                    )
+
+                    # Cria o novo processo
+                    novo_processo = OrdemProcesso.objects.create(
+                        ordem=nova_ordem,
+                        status='iniciada',
+                        data_inicio=now(),
+                    )
+
+                    # cria um novo registro em "pecasordem" com a nova ordem e com a mesma peça da ordem original
+                    peca = PecasOrdem.objects.filter(ordem=ordem).first()
+                    nova_peca_ordem = PecasOrdem.objects.create(
+                        ordem=nova_ordem,
+                        peca=peca.peca,
+                        qtd_planejada=qtd_planejada_total,
+                        qtd_boa=0,
+                        operador_inicio_id=operador_inicio,
+                        processo_ordem=novo_processo
+                    )
+                    nova_peca_ordem.operadores_inicio.set(operadores_inicio)
+                
+                    notificar_ordem(nova_ordem)
+
+                    return JsonResponse({
+                        'message': 'Ordem iniciada com sucesso.',
+                    })
+
+            # Próximo processo: só a partir de uma ordem em andamento;
+            # "continuar" só a partir de uma ordem aguardando o próximo processo
+            if status == 'agua_prox_proc' and ordem.status_atual != 'iniciada':
+                return JsonResponse({'error': 'Só uma ordem em andamento pode passar para o próximo processo. Atualize a página.'}, status=400)
+            if status == 'continuar' and ordem.status_atual != 'agua_prox_proc':
+                return JsonResponse({'error': 'Essa ordem não está aguardando o próximo processo. Atualize a página.'}, status=400)
+
+            if status == 'retorno' and ordem.status_atual == 'iniciada':
+                return JsonResponse({'error': f'Essa ordem já está iniciada. Atualize a página.'}, status=400)
+
+            # Início: um ou mais operadores, validados antes da transação (um return
+            # dentro dela não desfaria o processo já criado)
+            operadores_inicio = []
+            if status == 'iniciada':
+                try:
+                    operadores_inicio = operadores_do_corpo(body, 'operadores_inicio', 'operador_inicio')
+                except OperadorInvalido as exc:
+                    return JsonResponse({'error': str(exc)}, status=400)
+                if not operadores_inicio:
+                    return JsonResponse({'error': 'Selecione ao menos um operador.'}, status=400)
+
+            # "Continuar" no próximo processo: um ou mais operadores (obrigatório)
+            operadores_continuar = []
+            if status == 'continuar':
+                try:
+                    operadores_continuar = operadores_do_corpo(body, 'operadores', 'operador')
+                except OperadorInvalido as exc:
+                    return JsonResponse({'error': str(exc)}, status=400)
+                if not operadores_continuar:
+                    return JsonResponse({'error': 'Selecione ao menos um operador.'}, status=400)
+
+            with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
+
+                # Finaliza o processo atual (se existir)
+                processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
+                if processo_atual:
+                    processo_atual.finalizar_atual()
 
                 # Cria o novo processo
                 novo_processo = OrdemProcesso.objects.create(
-                    ordem=nova_ordem,
-                    status='iniciada',
-                    data_inicio=now(),
-                )
-
-                # cria um novo registro em "pecasordem" com a nova ordem e com a mesma peça da ordem original
-                peca = PecasOrdem.objects.filter(ordem=ordem).first()
-                nova_peca_ordem = PecasOrdem.objects.create(
-                    ordem=nova_ordem,
-                    peca=peca.peca,
-                    qtd_planejada=qtd_planejada_total,
-                    qtd_boa=0,
-                    operador_inicio_id=operador_inicio,
-                    processo_ordem=novo_processo
-                )
-                
-                notificar_ordem(nova_ordem)
-
-                return JsonResponse({
-                    'message': 'Ordem iniciada com sucesso.',
-                })
-
-        if status == 'retorno' and ordem.status_atual == 'iniciada':
-            return JsonResponse({'error': f'Essa ordem já está iniciada. Atualize a página.'}, status=400)
-
-        with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
-
-            # Finaliza o processo atual (se existir)
-            processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
-            if processo_atual:
-                processo_atual.finalizar_atual()
-
-            # Cria o novo processo
-            novo_processo = OrdemProcesso.objects.create(
-                ordem=ordem,
-                status='iniciada' if status == 'retorno' else status,
-                data_inicio=now(),
-                data_fim=now() if status in ['finalizada'] else None,
-            )
-
-            if status == 'iniciada':
-
-                operador_inicial = body.get('operador_inicio')
-                operador_inicial = get_object_or_404(Operador, pk=int(operador_inicial)) 
-
-                # Validações básicas
-                if ordem.status_atual == 'interrompida':
-                    return JsonResponse({'error': f'Essa ordem está interrompida, retorne ela.'}, status=400)
-
-                maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
-                for parada in maquinas_paradas:
-                    parada.data_fim = now()
-                    parada.save()
-
-                ordem.status_prioridade = 1
-
-                # Atualiza o status da ordem
-                ordem.status_atual = status
-
-                peca = PecasOrdem.objects.filter(ordem=ordem).first()
-
-                nova_peca_ordem = PecasOrdem.objects.create(
                     ordem=ordem,
-                    peca=peca.peca,
-                    qtd_planejada=peca.qtd_planejada,
-                    qtd_boa=0,
-                    operador_inicio=operador_inicial,
-                    processo_ordem=novo_processo
+                    status='iniciada' if status in ('retorno', 'continuar') else status,
+                    data_inicio=now(),
+                    data_fim=now() if status in ['finalizada'] else None,
                 )
+                if status == 'continuar':
+                    novo_processo.comentario_extra = ('Continuado por: ' + nomes_operadores(operadores_continuar))[:255]
+                    novo_processo.save(update_fields=['comentario_extra'])
 
-                nova_peca_ordem.save()
+                if status == 'iniciada':
 
-            elif status == 'retorno':
-                
-                maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
-                for parada in maquinas_paradas:
-                    parada.data_fim = now()
-                    parada.save()
+                    operador_inicial = operadores_inicio[0]  # validados antes da transação
 
-                ordem.status_prioridade = 1
+                    maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
+                    for parada in maquinas_paradas:
+                        parada.data_fim = now()
+                        parada.save()
 
-                # Atualiza o status da ordem
-                ordem.status_atual = 'iniciada'
+                    ordem.status_prioridade = 1
 
-                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
-                ultimo_peca_ordem.processo_ordem=novo_processo
-                
-                ultimo_peca_ordem.save()
+                    # Atualiza o status da ordem
+                    ordem.status_atual = status
 
-            elif status == 'finalizada':
-                operador_final = get_object_or_404(Operador, pk=int(body.get('operador_final')))
-                obs_final = body.get('obs_finalizar')
+                    peca = PecasOrdem.objects.filter(ordem=ordem).first()
 
-                ordem.operador_final = operador_final
-                ordem.obs_operador = obs_final
-
-                peca = PecasOrdem.objects.filter(ordem=ordem).first()
-
-                if not peca:
-                    return JsonResponse({'error': 'Nenhuma peça encontrada para essa ordem.'}, status=400)
-
-                # Verificar a quantidade já apontada antes de criar um novo registro
-                sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=ordem).aggregate(Sum('qtd_boa'))['qtd_boa__sum'] or 0
-                total_apontado = sum_pecas_finalizadas + int(qt_produzida)  # Soma a nova produção
-
-                # Se a nova quantidade ultrapassar a planejada, retorna erro
-                if total_apontado > peca.qtd_planejada:
-                    return JsonResponse({'error': 'Quantidade produzida maior que a quantidade planejada.'}, status=400)
-                
-                if total_apontado <= 0:
-                    return JsonResponse({'error': 'Quantidade produzida tem que ser maior que zero.'}, status=400)
-
-                # Criando o novo registro de apontamento
-                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
-                ultimo_peca_ordem.qtd_boa=int(qt_produzida)
-                ultimo_peca_ordem.processo_ordem=novo_processo
-                ultimo_peca_ordem.operador_final=operador_final
-                ultimo_peca_ordem.ordem=ordem.ordem_pai if ordem.ordem_pai else ordem
-                ultimo_peca_ordem.save()
-
-                if "-" in peca.peca:
-                    codigo = peca.peca.split(" - ", maxsplit=1)[0]
-                else:
-                    codigo = peca.peca
-                
-                # verifica se ta na lista de itens a ser inspecionado pelo setor da solda
-                conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
-                if conjuntos_inspecionados:
-                    Inspecao.objects.create(
-                        pecas_ordem_solda=ultimo_peca_ordem,
+                    nova_peca_ordem = PecasOrdem.objects.create(
+                        ordem=ordem,
+                        peca=peca.peca,
+                        qtd_planejada=peca.qtd_planejada,
+                        qtd_boa=0,
+                        operador_inicio=operador_inicial,
+                        processo_ordem=novo_processo
                     )
 
-                # Verificar novamente a quantidade finalizada após o novo registro
-                sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=ordem).aggregate(Sum('qtd_boa'))['qtd_boa__sum']
+                    nova_peca_ordem.save()
+                    nova_peca_ordem.operadores_inicio.set(operadores_inicio)
 
-                # Se a quantidade finalizada atingir a planejada, muda status para concluída
-                if sum_pecas_finalizadas == peca.qtd_planejada:
-                    ordem.status_atual = status
-                    ordem.status_prioridade = 3
-                    ordem.save()
-                else:
+                elif status == 'retorno':
+                
+                    maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
+                    for parada in maquinas_paradas:
+                        parada.data_fim = now()
+                        parada.save()
 
-                    # se o operador desejar continuar a ordem em aberto?
-                    # continua = True
-                    # mas e se o operador clicar sem querer?
-                    # Como ele finaliza apenas sem computar a ordem?
-                    if continua == True:
-                        ordem.status_atual = 'iniciada'
-                        ordem.status_prioridade = 1
-                        ordem.save()
+                    ordem.status_prioridade = 1
 
-                        nova_peca_ordem = PecasOrdem.objects.create(
-                            ordem=ordem,
-                            peca=peca.peca,
-                            qtd_planejada=peca.qtd_planejada,
-                            qtd_boa=0,
-                            operador_inicio=operador_final,
-                            processo_ordem=novo_processo
+                    # Atualiza o status da ordem
+                    ordem.status_atual = 'iniciada'
+
+                    ultimo_peca_ordem = _ultimo_lote_proprio_solda(ordem)
+                    ultimo_peca_ordem.processo_ordem=novo_processo
+                
+                    ultimo_peca_ordem.save()
+
+                elif status == 'finalizada':
+                    operador_final = get_object_or_404(Operador, pk=int(body.get('operador_final')))
+                    obs_final = body.get('obs_finalizar')
+
+                    ordem.operador_final = operador_final
+                    ordem.obs_operador = obs_final
+
+                    peca = PecasOrdem.objects.filter(ordem=ordem).first()
+
+                    if not peca:
+                        return JsonResponse({'error': 'Nenhuma peça encontrada para essa ordem.'}, status=400)
+
+                    # Ordem principal (travada): é nela que ficam os lotes finalizados
+                    # das paralelas, então a conferência de quantidade é sempre nela
+                    raiz = ordem
+                    if ordem.ordem_pai_id:
+                        raiz = Ordem.objects.select_for_update(of=('self',)).get(pk=ordem.ordem_pai_id)
+
+                    # Verificar a quantidade já apontada antes de criar um novo registro
+                    sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=raiz).aggregate(Sum('qtd_boa'))['qtd_boa__sum'] or 0
+                    total_apontado = sum_pecas_finalizadas + int(qt_produzida)  # Soma a nova produção
+
+                    # Se a nova quantidade ultrapassar a planejada, retorna erro
+                    if total_apontado > peca.qtd_planejada:
+                        return JsonResponse({'error': 'Quantidade produzida maior que a quantidade planejada.'}, status=400)
+                
+                    if total_apontado <= 0:
+                        return JsonResponse({'error': 'Quantidade produzida tem que ser maior que zero.'}, status=400)
+
+                    # Criando o novo registro de apontamento
+                    ultimo_peca_ordem = _ultimo_lote_proprio_solda(ordem)
+                    ultimo_peca_ordem.qtd_boa=int(qt_produzida)
+                    ultimo_peca_ordem.processo_ordem=novo_processo
+                    ultimo_peca_ordem.operador_final=operador_final
+                    ultimo_peca_ordem.ordem=raiz
+                    ultimo_peca_ordem.save()
+
+                    if "-" in peca.peca:
+                        codigo = peca.peca.split(" - ", maxsplit=1)[0]
+                    else:
+                        codigo = peca.peca
+                
+                    # verifica se ta na lista de itens a ser inspecionado pelo setor da solda
+                    conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
+                    if conjuntos_inspecionados:
+                        Inspecao.objects.create(
+                            pecas_ordem_solda=ultimo_peca_ordem,
                         )
 
-                        nova_peca_ordem.save()
+                    # Verificar novamente a quantidade finalizada após o novo registro
+                    sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=raiz).aggregate(Sum('qtd_boa'))['qtd_boa__sum']
 
-                    else:
-                        ordem.status_atual = 'aguardando_iniciar'
-                        ordem.status_prioridade = 1
+                    # Se a quantidade finalizada atingir a planejada, muda status para concluída
+                    if sum_pecas_finalizadas == peca.qtd_planejada:
+                        ordem.status_atual = status
+                        ordem.status_prioridade = 3
                         ordem.save()
+                        # nada mais a fazer: fecha a principal e as paralelas ainda abertas
+                        _encerrar_ordens_da_familia_solda(raiz, exceto_id=ordem.id)
+                    elif ordem.ordem_pai_id and continua != True:
+                        # paralela entregou sua parte (o lote já está na principal): sai da tela
+                        ordem.status_atual = status
+                        ordem.status_prioridade = 3
+                        ordem.save()
+                    else:
 
-            elif status == 'interrompida':
-                novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, pk=body['motivo'])
-                novo_processo.save()
-                ordem.status_prioridade = 2
+                        # se o operador desejar continuar a ordem em aberto?
+                        # continua = True
+                        # mas e se o operador clicar sem querer?
+                        # Como ele finaliza apenas sem computar a ordem?
+                        if continua == True:
+                            ordem.status_atual = 'iniciada'
+                            ordem.status_prioridade = 1
+                            ordem.save()
 
-                peca_falta = body.get('peca_falta')
-                maquina_id = body.get('maquina_id')
-                data_carga = body.get('data_carga')
+                            nova_peca_ordem = PecasOrdem.objects.create(
+                                ordem=ordem,
+                                peca=peca.peca,
+                                qtd_planejada=peca.qtd_planejada,
+                                qtd_boa=0,
+                                operador_inicio=operador_final,
+                                processo_ordem=novo_processo
+                            )
 
-                if peca_falta:
-                    solicitacao_peca=SolicitacaoPeca.objects.create(
-                        peca=get_object_or_404(Pecas, pk=peca_falta),
-                        localizacao_solicitante=get_object_or_404(Maquina, pk=maquina_id),
-                        data_carga=datetime.strptime(data_carga, "%Y-%m-%d").date()
-                    )
+                            nova_peca_ordem.save()
 
-                # Atualiza o status da ordem
-                ordem.status_atual = status
+                        else:
+                            ordem.status_atual = 'aguardando_iniciar'
+                            ordem.status_prioridade = 1
+                            ordem.save()
 
-                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
-                ultimo_peca_ordem.processo_ordem=novo_processo
+                elif status == 'agua_prox_proc':
+                    # parte do processo feita (por uma pessoa ou máquina): a ordem sai
+                    # de "Em andamento" e espera o próximo operador, sempre na mesma
+                    # célula. Nada de produção é registrado aqui.
+                    novo_processo.maquina = ordem.maquina
+                    novo_processo.save(update_fields=['maquina'])
+                    ordem.status_atual = 'agua_prox_proc'
+                    ordem.status_prioridade = 4
+
+                elif status == 'continuar':
+                    maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
+                    for parada in maquinas_paradas:
+                        parada.data_fim = now()
+                        parada.save()
+
+                    ordem.status_atual = 'iniciada'
+                    ordem.status_prioridade = 1
+
+                    # quem continuou soma aos operadores do lote aberto
+                    lote = _ultimo_lote_proprio_solda(ordem)
+                    if lote:
+                        lote.processo_ordem = novo_processo
+                        if not lote.operador_inicio_id:
+                            lote.operador_inicio = operadores_continuar[0]
+                        lote.save()
+                        lote.operadores_inicio.add(*operadores_continuar)
+
+                elif status == 'interrompida':
+                    novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, pk=body['motivo'])
+                    novo_processo.save()
+                    ordem.status_prioridade = 2
+
+                    peca_falta = body.get('peca_falta')
+                    maquina_id = body.get('maquina_id')
+                    data_carga = body.get('data_carga')
+
+                    if peca_falta:
+                        solicitacao_peca=SolicitacaoPeca.objects.create(
+                            peca=get_object_or_404(Pecas, pk=peca_falta),
+                            localizacao_solicitante=get_object_or_404(Maquina, pk=maquina_id),
+                            data_carga=datetime.strptime(data_carga, "%Y-%m-%d").date()
+                        )
+
+                    # Atualiza o status da ordem
+                    ordem.status_atual = status
+
+                    ultimo_peca_ordem = _ultimo_lote_proprio_solda(ordem)
+                    ultimo_peca_ordem.processo_ordem=novo_processo
                 
-                ultimo_peca_ordem.save()
+                    ultimo_peca_ordem.save()
 
-            ordem.save()
-            notificar_ordem(ordem)
+                ordem.save()
+                notificar_ordem(ordem)
             
 
-            return JsonResponse({
-                'message': 'Status atualizado com sucesso.',
-                'ordem_id': ordem.id,
-                'status': novo_processo.status,
-                'data_inicio': novo_processo.data_inicio,
-            })
+                return JsonResponse({
+                    'message': 'Status atualizado com sucesso.',
+                    'ordem_id': ordem.id,
+                    'status': novo_processo.status,
+                    'data_inicio': novo_processo.data_inicio,
+                })
 
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
@@ -657,7 +776,11 @@ def ordens_iniciadas(request):
                 .first()
         )
 
-        operador_inicio = registro_inicio.operador_inicio.matricula + " - " + registro_inicio.operador_inicio.nome.split(' ')[0] if registro_inicio else None
+        # todos os que iniciaram (registros antigos só têm operador_inicio)
+        operador_inicio = (
+            nomes_operadores(list(registro_inicio.operadores_inicio.all()) or [registro_inicio.operador_inicio], primeiro_nome=True)
+            if registro_inicio else None
+        )
 
         # Obtém apenas os nomes das peças, eliminando duplicatas
         pecas_unicas = sorted(set(peca.peca for peca in ordem.ordem_pecas_solda.all()))
@@ -707,7 +830,7 @@ def ordens_iniciadas(request):
 
     return JsonResponse({"ordens": resultado,'usuario_tipo_acesso': usuario_tipo}, safe=False)
 
-def ordens_interrompidas(request):
+def ordens_interrompidas(request, status_lista='interrompida'):
     """
     Retorna todas as ordens que estão com status "interrompida" e que ainda não foram finalizadas,
     trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
@@ -725,13 +848,15 @@ def ordens_interrompidas(request):
 
     filtros_ordem = {
         'grupo_maquina': 'solda',
-        'status_atual': 'interrompida',
+        'status_atual': status_lista,
         'excluida': False,
     }
 
     if maquina_param:
-        maquina = get_object_or_404(Maquina, pk=maquina_param)
-        filtros_ordem['maquina'] = maquina
+        # setor salvo no navegador que não existe mais: ignora o filtro
+        maquina = Maquina.objects.filter(pk=maquina_param).first() if str(maquina_param).isdigit() else None
+        if maquina:
+            filtros_ordem['maquina'] = maquina
 
     ordens_filtradas = Ordem.objects.filter(**filtros_ordem).prefetch_related('ordem_pecas_solda', 'processos')
 
@@ -749,7 +874,11 @@ def ordens_interrompidas(request):
                 .first()
         )
 
-        operador_inicio = registro_inicio.operador_inicio.matricula + " - " + registro_inicio.operador_inicio.nome.split(' ')[0] if registro_inicio else None
+        # todos os que iniciaram (registros antigos só têm operador_inicio)
+        operador_inicio = (
+            nomes_operadores(list(registro_inicio.operadores_inicio.all()) or [registro_inicio.operador_inicio], primeiro_nome=True)
+            if registro_inicio else None
+        )
 
         # Obtém apenas os nomes das peças, eliminando duplicatas
         pecas_unicas = sorted(set(peca.peca for peca in ordem.ordem_pecas_solda.all()))
@@ -778,6 +907,7 @@ def ordens_interrompidas(request):
             "grupo_maquina": ordem_atual.grupo_maquina,
             "maquina": ordem_atual.maquina.nome if ordem_atual.maquina else None,
             "status_atual": ordem_atual.status_atual,
+            "etapas_concluidas": ordem_atual.processos.filter(status='agua_prox_proc').count(),
             "ultima_atualizacao": ordem_atual.ultima_atualizacao,
             "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
             "qtd_restante": (agregacoes['total_planejada'] / pecas_para_somar.count()) - agregacoes['total_boa'],  # Soma total de qtd_planejada
@@ -796,6 +926,12 @@ def ordens_interrompidas(request):
         })
 
     return JsonResponse({"ordens": resultado, 'usuario_tipo_acesso': usuario_tipo}, safe=False)
+
+
+def ordens_aguardando_etapa(request):
+    """Ordens aguardando o próximo processo (status "agua_prox_proc"), à
+    espera do próximo operador; mesmo formato das interrompidas."""
+    return ordens_interrompidas(request, 'agua_prox_proc')
 
 def listar_operadores(request):
     maquina_id = request.GET.get('maquina')
@@ -1299,6 +1435,10 @@ def api_apontamento_qrcode(request):
         if 'iniciada' in status_list:
             status_calculado = 'iniciada'
             print("Status calculado: iniciada (pelo menos uma iniciada)")
+        # Regra 1b: alguma aguardando o próximo processo → "agua_prox_proc"
+        # (a tela pergunta se tem certeza antes de iniciar)
+        elif 'agua_prox_proc' in status_list:
+            status_calculado = 'agua_prox_proc'
         # Regra 2: Se qtd_planejada == qtd_boa_total → "finalizada"
         elif qtd_planejada > 0 and qtd_planejada == qtd_boa_total:
             status_calculado = 'finalizada'

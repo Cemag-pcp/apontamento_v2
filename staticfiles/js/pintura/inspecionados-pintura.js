@@ -97,7 +97,7 @@ function buscarItensInspecionados(pagina) {
     if (dataSelecionadaInicio) {
         params.append("data_inicio", dataSelecionadaInicio);
         itensFiltradosDataInicio.style.display = "block";
-        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
+        itensFiltradosDataInicio.textContent = "Inspeção de: " + formatarDataBR(dataSelecionadaInicio);
     } else {
         itensFiltradosDataInicio.style.display = "none";
     }
@@ -105,10 +105,14 @@ function buscarItensInspecionados(pagina) {
     if (dataSelecionadaFim) {
         params.append("data_fim", dataSelecionadaFim);
         itensFiltradosDataFim.style.display = "block";
-        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
+        itensFiltradosDataFim.textContent = "Inspeção até: " + formatarDataBR(dataSelecionadaFim);
     } else {
         itensFiltradosDataFim.style.display = "none";
     }
+
+    // periodos: producao e carga (somam com o da inspecao)
+    aplicarFiltroPeriodo(params, { campo: 'producao-filtro-inspecionados', param: 'producao', rotulo: 'Produção', chip: 'itens-filtrados-inspecionados-producao' });
+    aplicarFiltroPeriodo(params, { campo: 'carga-filtro-inspecionados', param: 'carga', rotulo: 'Carga', chip: 'itens-filtrados-inspecionados-carga' });
 
     if (pesquisarInspecao) {
         params.append("pesquisar", pesquisarInspecao);
@@ -135,6 +139,10 @@ function buscarItensInspecionados(pagina) {
         itensFiltradosInspetor.style.display = "none";
     }
 
+    // Somente inspecoes que passaram pela reinspecao
+    if (document.getElementById('filter-itens-reinspecionadas')?.checked) {
+        params.append("reinspecionadas", "1");
+    }
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
     fetch(`/inspecao/api/itens-inspecionados-pintura/?${params.toString()}`, {
@@ -171,24 +179,6 @@ function buscarItensInspecionados(pagina) {
                 "Amarelo": "yellow", "Cinza": "gray"
             };
 
-            let iconeNaoConformidade;
-
-            if (item.possui_nao_conformidade) {
-            iconeNaoConformidade = `
-                <span class="badge rounded-pill bg-danger">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                Não conformidade
-                </span>
-            `;
-            } else {
-            iconeNaoConformidade = `
-                <span class="badge rounded-pill bg-success">
-                <i class="bi bi-check-circle-fill me-1"></i>
-                Conforme
-                </span>
-            `;
-            }
-
             let color = borderColors[item.cor];
 
             const cards = `
@@ -204,11 +194,16 @@ function buscarItensInspecionados(pagina) {
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}<br>
                     </p>
                     <hr>
-                    <div class="d-flex justify-content-between">
-                        <div class="d-flex align-items-baseline gap-2">
-                            ${iconeNaoConformidade}
-                        </div>
-                        <button 
+                    <div class="d-flex justify-content-center gap-3 mb-2">
+                        <span class="text-success" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-check-circle-fill"></i> Conforme: ${item.conformidade}
+                        </span>
+                        <span class="text-danger" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-x-circle-fill"></i> Não conforme: ${item.nao_conformidade}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button
                             data-id="${item.id}"
                             data-data="${item.data}"
                             data-peca="${item.peca}"
@@ -217,7 +212,7 @@ function buscarItensInspecionados(pagina) {
                             data-conformidade="${item.conformidade}"
                             data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
+                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>

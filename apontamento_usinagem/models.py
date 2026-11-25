@@ -27,3 +27,6 @@ class PecasOrdem(models.Model):
     apontado = models.BooleanField(default=False)
     tipo_apontamento = models.CharField(max_length=20, null=True, blank=True) # manual ou api
     erro_apontamento = models.TextField(null=True, blank=True)
+    # O ERP demorou a responder: o apontamento pode ter entrado lá. Fica
+    # bloqueado até alguém conferir (ver core/erp_apontamento.py).
+    aguardando_confirmacao_erp = models.BooleanField(default=False)

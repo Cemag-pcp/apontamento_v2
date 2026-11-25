@@ -38,11 +38,17 @@ from apontamento_estamparia.models import (
     MedidasInspecaoEstamparia,
     DadosNaoConformidade,
     ImagemNaoConformidade,
+    RascunhoInspecaoEstamparia,
 )
 
 from datetime import datetime, timedelta
 from collections import defaultdict
 import json
+
+# Abas "A inspecionar" e "Reinspeção": sem nenhum filtro aplicado a lista
+# mostra so os registros dos ultimos DIAS_PADRAO_LISTA dias. Qualquer filtro
+# (data, maquina, pesquisa, inspetor) busca em todo o historico.
+DIAS_PADRAO_LISTA = 30
 
 
 def inspecao_estamparia(request):
@@ -288,7 +294,50 @@ def inspecionar_estamparia(request):
                 reinspecao = Reinspecao(inspecao=inspecao)
                 reinspecao.save()
 
+            # Inspeção enviada: o "Salvar parcial" dela deixa de valer
+            RascunhoInspecaoEstamparia.objects.filter(inspecao=inspecao).delete()
+
     return JsonResponse({"success": True, "message": "Inspeção realizada com sucesso!"})
+
+
+def rascunho_inspecao_estamparia(request, id):
+    """"Salvar parcial" da inspeção guardado no servidor, pra o inspetor
+    continuar em outro aparelho. GET devolve, POST grava (JSON do formulário),
+    DELETE descarta."""
+    inspecao = get_object_or_404(Inspecao, pk=id, pecas_ordem_estamparia__isnull=False)
+
+    if request.method == "GET":
+        rascunho = RascunhoInspecaoEstamparia.objects.filter(inspecao=inspecao).select_related("usuario").first()
+        if not rascunho:
+            return JsonResponse({"existe": False})
+        return JsonResponse({
+            "existe": True,
+            "dados": rascunho.dados,
+            "usuario": rascunho.usuario.username if rascunho.usuario else None,
+            "atualizado_em": timezone.localtime(rascunho.atualizado_em).strftime("%d/%m/%Y %H:%M"),
+        })
+
+    if request.method == "POST":
+        if DadosExecucaoInspecao.objects.filter(inspecao=inspecao).exists():
+            return JsonResponse({"error": "Item já inspecionado!"}, status=400)
+        try:
+            dados = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON inválido."}, status=400)
+        RascunhoInspecaoEstamparia.objects.update_or_create(
+            inspecao=inspecao,
+            defaults={
+                "dados": dados,
+                "usuario": request.user if request.user.is_authenticated else None,
+            },
+        )
+        return JsonResponse({"success": True})
+
+    if request.method == "DELETE":
+        RascunhoInspecaoEstamparia.objects.filter(inspecao=inspecao).delete()
+        return JsonResponse({"success": True})
+
+    return JsonResponse({"error": "Método não permitido"}, status=405)
 
 
 def get_itens_inspecao_estamparia(request):
@@ -315,6 +364,12 @@ def get_itens_inspecao_estamparia(request):
     )
 
     quantidade_total = datas.count()  # Total de itens sem filtro
+
+    limitado_periodo_padrao = not (maquinas_filtradas or data_inicio or data_fim or pesquisa_filtrada)
+    if limitado_periodo_padrao:
+        datas = datas.filter(
+            data_inspecao__gte=timezone.now() - timedelta(days=DIAS_PADRAO_LISTA)
+        )
 
     if maquinas_filtradas:
         datas = datas.filter(
@@ -351,6 +406,13 @@ def get_itens_inspecao_estamparia(request):
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    # Inspeções com "Salvar parcial" guardado no servidor (selo "Parcial" no card)
+    ids_com_rascunho = set(
+        RascunhoInspecaoEstamparia.objects.filter(
+            inspecao__in=[data.id for data in pagina_obj]
+        ).values_list("inspecao_id", flat=True)
+    )
+
     dados = []
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
@@ -379,6 +441,7 @@ def get_itens_inspecao_estamparia(request):
             "maquina": maquina_nome,
             "qtd_apontada": data.pecas_ordem_estamparia.qtd_boa,
             "operador": matricula_nome_operador,
+            "parcial": data.id in ids_com_rascunho,
         }
 
         dados.append(item)
@@ -390,6 +453,7 @@ def get_itens_inspecao_estamparia(request):
             "total_filtrado": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
+            "limitado_dias": DIAS_PADRAO_LISTA if limitado_periodo_padrao else None,
         },
         status=200,
     )
@@ -426,6 +490,14 @@ def get_itens_reinspecao_estamparia(request):
     # Otimização 2: Construir a query de forma incremental
     query = Q(id__in=reinspecao_ids) & Q(pecas_ordem_estamparia__isnull=False)
 
+    limitado_periodo_padrao = not (
+        maquinas_filtradas or inspetores_filtrados or data_inicio or data_fim or pesquisa_filtrada
+    )
+    if limitado_periodo_padrao:
+        query &= Q(
+            dadosexecucaoinspecao__data_execucao__gte=timezone.now() - timedelta(days=DIAS_PADRAO_LISTA)
+        )
+
     if maquinas_filtradas:
         query &= Q(pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas)
 
@@ -452,7 +524,7 @@ def get_itens_reinspecao_estamparia(request):
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
-        query &= Q(pecas_ordem_estamparia__peca__icontains=pesquisa_filtrada)
+        query &= Q(pecas_ordem_estamparia__peca__codigo__icontains=pesquisa_filtrada)
 
     if inspetores_filtrados:
         query &= Q(
@@ -575,6 +647,7 @@ def get_itens_reinspecao_estamparia(request):
             "total_filtrado": paginador.count,
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
+            "limitado_dias": DIAS_PADRAO_LISTA if limitado_periodo_padrao else None,
         },
         status=200,
     )
@@ -683,11 +756,21 @@ def get_itens_inspecionados_estamparia(request):
                 dadosexecucaoinspecao__num_execucao=0,
             )
 
+    # Filtro "Reinspecionadas": so as que passaram pela reinspecao de fato -
+    # concluida e com execucao de reinspecao (num_execucao > 0). Fica de fora a
+    # reinspecao fechada automaticamente quando a peca vai pra sucata.
+    if request.GET.get("reinspecionadas") == "1":
+        datas = datas.filter(
+            id__in=Reinspecao.objects.filter(reinspecionado=True).values("inspecao")
+        ).filter(
+            id__in=DadosExecucaoInspecao.objects.filter(num_execucao__gt=0).values("inspecao")
+        )
+
     datas = datas.select_related(
         "pecas_ordem_estamparia",
         "pecas_ordem_estamparia__ordem",
         "pecas_ordem_estamparia__operador",
-    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    ).order_by("-ultima_data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -697,9 +780,12 @@ def get_itens_inspecionados_estamparia(request):
         inspecao__in=pagina_obj
     ).select_related(
         "inspecao", "inspetor__user", "inspecao__pecas_ordem_estamparia__ordem__maquina"
-    )
+    ).order_by("data_execucao")
 
-    # Cria um dicionário para mapear inspecao_id para seus dados de execução
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução.
+    # Itera em ordem crescente de data_execucao e vai sobrescrevendo, entao
+    # a ultima escrita por inspecao_id e sempre a execucao mais recente (ex:
+    # a reinspecao, quando existir, prevalece sobre a inspecao original).
     dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
 
     dados = []
@@ -707,9 +793,7 @@ def get_itens_inspecionados_estamparia(request):
         de = dados_execucao_dict.get(data.id)
 
         if de:
-            data_ajustada = DadosExecucaoInspecao.objects.filter(
-                inspecao=data
-            ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+            data_ajustada = de.data_execucao - timedelta(hours=3)
 
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
 
@@ -725,6 +809,10 @@ def get_itens_inspecionados_estamparia(request):
                 ),
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
+                "conformidade": de.conformidade,
+                "nao_conformidade": de.nao_conformidade,
+                "qtd_produzida": data.pecas_ordem_estamparia.qtd_boa,
+                "qtd_inspecionada": de.conformidade + de.nao_conformidade,
             }
 
             dados.append(item)
@@ -1111,37 +1199,20 @@ def indicador_estamparia_resumo_analise_temporal(request):
     if data_fim:
         queryset = queryset.filter(data_inspecao__lte=data_fim)
 
-    # 1) Extrai ordem_id de cada Inspecao filtrada, com o mês correspondente
-    ordem_mes_rows = (
-        queryset
-        .annotate(
-            ano=ExtractYear("data_inspecao"),
-            mes_num=ExtractMonth("data_inspecao"),
-        )
-        .values("ano", "mes_num", "pecas_ordem_estamparia__ordem_id")
-        .distinct()
-    )
-
-    # 2) Monta mapa: ordem_id -> lista de (ano, mes_num)
-    ordem_mes_map = defaultdict(list)
-    for row in ordem_mes_rows:
-        ordem_id = row["pecas_ordem_estamparia__ordem_id"]
-        if ordem_id:
-            ordem_mes_map[ordem_id].append((row["ano"], row["mes_num"]))
-
-    # 3) Busca qtd_boa em PecasOrdem pelo ordem_id
-    pecas_qtd = (
-        PecasOrdem.objects
-        .filter(ordem_id__in=ordem_mes_map.keys())
-        .values("ordem_id")
+    # Peças produzidas: soma qtd_boa só dos apontamentos feitos no período, pelo mês
+    # do próprio apontamento (antes somava a ordem inteira em todo mês que tivesse inspeção)
+    pecas_periodo = PecasOrdem.objects.filter(qtd_boa__gt=0, data__isnull=False)
+    if data_inicio:
+        pecas_periodo = pecas_periodo.filter(data__gte=data_inicio)
+    if data_fim:
+        pecas_periodo = pecas_periodo.filter(data__lt=data_fim)
+    qtd_boa_dict = {
+        (row["ano"], row["mes_num"]): row["total_qtd_boa"] or 0
+        for row in pecas_periodo
+        .annotate(ano=ExtractYear("data"), mes_num=ExtractMonth("data"))
+        .values("ano", "mes_num")
         .annotate(total_qtd_boa=Sum("qtd_boa"))
-    )
-
-    # 4) Distribui por mês
-    qtd_boa_dict = defaultdict(int)
-    for row in pecas_qtd:
-        for mes_key in ordem_mes_map[row["ordem_id"]]:
-            qtd_boa_dict[mes_key] += row["total_qtd_boa"] or 0
+    }
 
     # 0) Conta NC por mês usando DadosNaoConformidade — mesma fonte da tabela de causas
     nc_qs = DadosNaoConformidade.objects.filter(

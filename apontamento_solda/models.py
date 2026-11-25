@@ -13,6 +13,8 @@ class PecasOrdem(models.Model):
     qtd_boa=models.FloatField(default=0)
     operador_inicio=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_inicio_solda', blank=True, null=True)
     operador_final=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_solda', blank=True, null=True)
+    # todos os operadores que iniciaram (operador_inicio guarda o primeiro)
+    operadores_inicio = models.ManyToManyField(Operador, related_name='pecas_solda_iniciadas', blank=True)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     processo_ordem = models.ForeignKey(OrdemProcesso, on_delete=models.CASCADE, related_name='processo_ordem_solda', blank=True, null=True)
 

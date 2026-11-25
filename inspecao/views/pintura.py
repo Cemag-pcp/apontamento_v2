@@ -1,13 +1,16 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q, Max
+from django.db.models import Q, Max, F
 from django.db import transaction
 from django.utils import timezone
 from django.db import connection
 
-from apontamento_pintura.models import Retrabalho
+from apontamento_pintura.models import Retrabalho, PecasOrdem
 from ..models import (
+    RegistroLimpezaPintura,
+    RegistroLimpezaPinturaEtapa,
+    RegistroLimpezaPinturaMaterial,
     Inspecao,
     DadosExecucaoInspecao,
     Reinspecao,
@@ -17,11 +20,18 @@ from ..models import (
     ArquivoConformidade,
     AnaliseBanhoEzinger,
 )
+from .rascunho import (
+    anexar_fotos_rascunho,
+    encerrar_rascunho,
+    ids_com_rascunho,
+    responder_rascunho,
+)
 from core.models import Profile
 
 from datetime import datetime, timedelta
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import json
 
 from storages.backends.s3boto3 import S3Boto3Storage
 
@@ -102,6 +112,54 @@ def _calcular_analise_banho(amostras_desengraxante, amostras_fosfatizante):
     }
 
 
+# Checklist da inspeção de pintura: 3 grupos (OK / Ñ OK por unidade); no
+# Ñ OK o inspetor escolhe uma ou mais falhas do grupo. Cada falha é
+# (nome exibido, nome da causa no cadastro): a causa é achada pelo nome
+# (sem diferenciar maiúsculas), porque os ids mudam entre bancos. Só o nome
+# exibido muda; o que fica gravado continua sendo a causa do cadastro.
+# As demais causas da pintura (antigo item "Outros") saem do formulário, mas
+# continuam no cadastro e no histórico.
+GRUPOS_CHECKLIST_PINTURA = [
+    ("Brilho e Tonalidade", [
+        ("Peça fosca", "Brilho"),
+        ("Cor errada", "Cor errada"),
+        ("Tonalidade divergente", "Tonalidade"),
+    ]),
+    ("Aplicação, cobertura e aderência de tinta", [
+        ("Camada baixa", "Camada Baixa"),
+        ("Casca de laranja", "Casca de Laranja"),
+        ("Escorrimento", "Escorrimento"),
+        ("Olho de peixe", "Olho de Peixe"),
+        ("Desplacamento", "Desplacamento"),
+    ]),
+    ("Acabamento final da peça", [
+        ("Contaminação", "Contaminação"),
+        ("Marcação na peça", "Marcação de Peça"),
+        ("Corrosão na chapa", "Corrosão"),
+        ("Empoeiramento", "Empoeiramento"),
+        ("Marcação por óleo ou água", "Marcação por Óleo ou Água"),
+        ("Amassado", "Amassando"),
+        ("Respingo de solda", "Respingo de Solda"),
+    ]),
+]
+
+
+def _causas_checklist_pintura(list_causas):
+    """{"grupos": [{"nome", "causas": [{"id", "nome"}]}]} com o nome de
+    exibição de cada falha. Falha sem causa no cadastro fica de fora."""
+    por_nome = {c["nome"].strip().casefold(): c for c in list_causas}
+    grupos = []
+    for nome_grupo, falhas in GRUPOS_CHECKLIST_PINTURA:
+        causas = [
+            {"id": por_nome[cadastro.casefold()]["id"], "nome": exibido}
+            for exibido, cadastro in falhas
+            if cadastro.casefold() in por_nome
+        ]
+        if causas:
+            grupos.append({"nome": nome_grupo, "causas": causas})
+    return {"grupos": grupos}
+
+
 def inspecao_pintura(request):
 
     users = Profile.objects.filter(
@@ -135,6 +193,8 @@ def inspecao_pintura(request):
             "inspetor_logado": inspetor_logado,
             "inspetores": lista_inspetores,
             "causas": list_causas,
+            # checklist OK / Ñ OK por unidade no modal de inspeção (como na montagem)
+            "causas_checklist_json": json.dumps(_causas_checklist_pintura(list_causas), ensure_ascii=False),
             "cores": cores,
             "tipos_tinta": tipos_tinta,
         },
@@ -143,6 +203,371 @@ def inspecao_pintura(request):
 
 def inspecao_banhos_ezinger(request):
     return render(request, "inspecao_banhos_ezinger.html")
+
+
+def registro_limpeza_pintura(request):
+    users = Profile.objects.filter(
+        tipo_acesso="inspetor", permissoes__nome="inspecao/pintura"
+    ).select_related("user")
+    lista_inspetores = [
+        {"nome_usuario": user.user.username, "id": user.id} for user in users
+    ]
+
+    # inspetor logado já vem selecionado no modal
+    perfil = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
+    inspetor_logado = perfil.id if perfil and any(i["id"] == perfil.id for i in lista_inspetores) else None
+
+    return render(
+        request,
+        "registro_limpeza_pintura.html",
+        {
+            "inspetores": lista_inspetores,
+            "inspetor_logado": inspetor_logado,
+            "processos": RegistroLimpezaPintura.PROCESSO_CHOICES,
+        },
+    )
+
+
+def pecas_registro_limpeza_pintura(request):
+    """Peças da pintura (já pintadas ou não) para o campo Material: uma opção
+    por peça + ordem da pintura (com a cor e a data de carga da ordem), as
+    cargas mais recentes primeiro. Formato do select2: {"results": [{"id", "text", ...}]}."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    pecas = PecasOrdem.objects.all()
+    termo = request.GET.get("q", "").strip()
+    if termo:
+        pecas = pecas.filter(peca__icontains=termo)
+
+    pecas = (
+        pecas.values("peca", "ordem_id", "ordem__ordem", "ordem__cor", "ordem__data_carga")
+        .annotate(ultima=Max("data"))
+        .order_by(
+            F("ordem__data_carga").desc(nulls_last=True),
+            F("ultima").desc(nulls_last=True),
+        )[:30]
+    )
+
+    resultados = []
+    for p in pecas:
+        data_carga = p["ordem__data_carga"]
+        resultados.append({
+            "id": f'{p["ordem_id"]}|{p["peca"]}',
+            "text": p["peca"],
+            "peca": p["peca"],
+            "ordem": p["ordem__ordem"],
+            "cor": p["ordem__cor"] or "",
+            "data_carga_br": data_carga.strftime("%d/%m/%Y") if data_carga else "",
+        })
+    return JsonResponse({"results": resultados})
+
+
+def _registro_limpeza_json(registro):
+    """Registro de limpeza com as etapas, para o histórico e para continuar
+    um registro salvo parcialmente."""
+    def quem(perfil):
+        return perfil.user.username if perfil and perfil.user else "-"
+
+    def opcao(material):
+        # opção do campo Material (mesmo formato de pecas_registro_limpeza_pintura)
+        return {
+            "id": f"{material.ordem_id}|{material.peca}",
+            "text": material.peca,
+            "peca": material.peca,
+            "ordem": material.ordem.ordem if material.ordem else None,
+            "cor": material.cor or "",
+            "data_carga_br": material.data_carga.strftime("%d/%m/%Y") if material.data_carga else "",
+        }
+
+    def unicos(valores):
+        return list(dict.fromkeys(v for v in valores if v))
+
+    materiais = list(registro.materiais.all())
+
+    return {
+        "id": registro.id,
+        "data": timezone.localtime(registro.data).strftime("%d/%m/%Y %H:%M"),
+        "data_iso": timezone.localtime(registro.data).strftime("%Y-%m-%dT%H:%M"),
+        "inspetor": quem(registro.inspetor),
+        "inspetor_id": registro.inspetor_id,
+        "processo": registro.get_processo_display(),
+        "processo_valor": registro.processo,
+        # um ou mais materiais: a lista mostra todos
+        "materiais": [opcao(m) for m in materiais if m.ordem_id],
+        "pecas": [m.peca for m in materiais],
+        "peca": "; ".join(m.peca for m in materiais) or registro.peca,
+        "ordem": ", ".join(unicos(str(m.ordem.ordem) for m in materiais if m.ordem)) or "-",
+        "cor": ", ".join(unicos(m.cor for m in materiais)) or "-",
+        "data_carga": ", ".join(unicos(
+            m.data_carga.strftime("%d/%m/%Y") for m in materiais if m.data_carga
+        )) or "-",
+        "quantidade": registro.quantidade,
+        "conforme": registro.conforme,
+        "finalizado": registro.finalizado,
+        "conforme_final": registro.conforme_final,
+        "total_reinspecoes": registro.total_reinspecoes,
+        "etapas": [
+            {
+                "numero": etapa.numero,
+                "conforme": etapa.conforme,
+                "imagem": etapa.imagem.url if etapa.imagem else None,
+                "nova_limpeza": etapa.nova_limpeza,
+                "inspetor": quem(etapa.inspetor),
+                "data": timezone.localtime(etapa.atualizado_em).strftime("%d/%m/%Y %H:%M"),
+            }
+            for etapa in registro.etapas.all()
+        ],
+    }
+
+
+def listar_registros_limpeza_pintura(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    registros = (
+        RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem")
+        .prefetch_related("etapas__inspetor__user", "materiais__ordem")
+        .order_by("-data", "-id")
+    )
+
+    pesquisa = request.GET.get("pesquisar", "").strip()
+    processo = request.GET.get("processo", "")
+    resultado = request.GET.get("resultado", "")
+    final = request.GET.get("final", "")
+    situacao = request.GET.get("situacao", "")
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    if pesquisa:
+        registros = registros.filter(
+            Q(peca__icontains=pesquisa) | Q(materiais__peca__icontains=pesquisa)
+        ).distinct()
+    if processo:
+        registros = registros.filter(processo=processo)
+    if resultado in ("conforme", "nao_conforme"):
+        registros = registros.filter(conforme=resultado == "conforme")
+    if final in ("conforme", "nao_conforme"):
+        registros = registros.filter(conforme_final=final == "conforme")
+    if situacao in ("andamento", "finalizado"):
+        registros = registros.filter(finalizado=situacao == "finalizado")
+    if data_inicio:
+        registros = registros.filter(data__date__gte=data_inicio)
+    if data_fim:
+        registros = registros.filter(data__date__lte=data_fim)
+
+    paginador = Paginator(registros, 20)
+    pagina_obj = paginador.get_page(request.GET.get("pagina", 1))
+
+    return JsonResponse(
+        {
+            "dados": [_registro_limpeza_json(registro) for registro in pagina_obj],
+            "total_filtrado": paginador.count,
+            "pagina_atual": pagina_obj.number,
+            "total_paginas": paginador.num_pages,
+        },
+        status=200,
+    )
+
+
+def detalhe_registro_limpeza_pintura(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    registro = get_object_or_404(
+        RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem")
+        .prefetch_related("etapas__inspetor__user", "materiais__ordem"),
+        pk=id,
+    )
+    return JsonResponse(_registro_limpeza_json(registro))
+
+
+def salvar_registro_limpeza_pintura(request):
+    """Salva o registro de limpeza. "parcial" = 1 grava o que já foi
+    respondido (fica "Em andamento"); sem ele o fluxo tem de estar completo.
+    "registro_id" continua um registro salvo parcialmente: as fotos já
+    salvas valem se a etapa não mandar outra."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    parcial = request.POST.get("parcial") == "1"
+
+    inspetor = Profile.objects.filter(pk=request.POST.get("inspetor") or None).first()
+    if not inspetor:
+        return JsonResponse({"error": "Selecione o inspetor."}, status=400)
+
+    try:
+        data = timezone.make_aware(datetime.fromisoformat(request.POST.get("data", "")))
+    except ValueError:
+        return JsonResponse({"error": "Informe uma data válida."}, status=400)
+
+    processo = request.POST.get("processo")
+    if processo not in dict(RegistroLimpezaPintura.PROCESSO_CHOICES):
+        return JsonResponse({"error": "Selecione o processo de pintura."}, status=400)
+
+    # Material: um ou mais, cada um "<id da ordem>|<peça>" (opção do select2)
+    materiais = []
+    vistos = set()
+    for valor in request.POST.getlist("peca"):
+        ordem_id, _, peca = valor.partition("|")
+        peca = peca.strip()
+        if not peca or (ordem_id, peca) in vistos:
+            continue
+        item = (
+            PecasOrdem.objects.select_related("ordem")
+            .filter(ordem_id=ordem_id if ordem_id.isdigit() else None, peca=peca)
+            .first()
+        )
+        if not item:
+            return JsonResponse({"error": f'Peça "{peca}" não encontrada na pintura.'}, status=400)
+        vistos.add((ordem_id, peca))
+        materiais.append((item.ordem, peca))
+    if not materiais:
+        return JsonResponse({"error": "Selecione ao menos uma peça da pintura."}, status=400)
+    ordem, peca = materiais[0]
+
+    arquivos_apagar = []
+    with transaction.atomic():
+        registro = None
+        registro_id = request.POST.get("registro_id")
+        if registro_id:
+            registro = (
+                RegistroLimpezaPintura.objects.select_for_update()
+                .filter(pk=registro_id if registro_id.isdigit() else None)
+                .first()
+            )
+            if not registro:
+                return JsonResponse({"error": "Registro não encontrado."}, status=404)
+            if registro.finalizado:
+                return JsonResponse({"error": "Este registro já foi finalizado."}, status=400)
+
+        existentes = {etapa.numero: etapa for etapa in registro.etapas.all()} if registro else {}
+        etapas, erro = _etapas_registro_limpeza(
+            request, parcial, {n for n, etapa in existentes.items() if etapa.imagem}
+        )
+        if erro:
+            return JsonResponse({"error": erro}, status=400)
+
+        if not registro:
+            registro = RegistroLimpezaPintura(
+                registrado_por=request.user if request.user.is_authenticated else None,
+            )
+        registro.inspetor = inspetor
+        registro.data = data
+        registro.processo = processo
+        registro.ordem = ordem
+        registro.peca = peca
+        registro.cor = ordem.cor
+        registro.data_carga = ordem.data_carga
+        registro.quantidade = len(materiais)  # nº de materiais do registro
+        registro.conforme = etapas[0]["conforme"] if etapas else None
+        registro.finalizado = not parcial
+        registro.conforme_final = etapas[-1]["conforme"] if not parcial else None
+        registro.total_reinspecoes = max(len(etapas) - 1, 0)
+        registro.save()
+
+        # materiais: substitui pela lista atual (ordem da escolha)
+        registro.materiais.all().delete()
+        RegistroLimpezaPinturaMaterial.objects.bulk_create([
+            RegistroLimpezaPinturaMaterial(
+                registro=registro, ordem=ordem_m, peca=peca_m,
+                cor=ordem_m.cor, data_carga=ordem_m.data_carga, posicao=posicao,
+            )
+            for posicao, (ordem_m, peca_m) in enumerate(materiais)
+        ])
+
+        # Atualiza as etapas no lugar (guarda quem respondeu e quando);
+        # as que sobraram de uma versão anterior do fluxo são apagadas
+        for numero, dados in enumerate(etapas):
+            etapa = existentes.pop(numero, None)
+            if etapa is None:
+                etapa = RegistroLimpezaPinturaEtapa(registro=registro, numero=numero, inspetor=inspetor)
+            elif (etapa.conforme, etapa.nova_limpeza) != (dados["conforme"], dados["nova_limpeza"]) or dados["imagem"]:
+                etapa.inspetor = inspetor
+            etapa.conforme = dados["conforme"]
+            etapa.nova_limpeza = dados["nova_limpeza"]
+            if dados["imagem"] or dados["sem_imagem"]:
+                if etapa.imagem:
+                    arquivos_apagar.append(etapa.imagem.name)
+                etapa.imagem = dados["imagem"]
+            etapa.save()
+        for sobra in existentes.values():
+            if sobra.imagem:
+                arquivos_apagar.append(sobra.imagem.name)
+            sobra.delete()
+
+        if arquivos_apagar:
+            transaction.on_commit(lambda: _apagar_arquivos_limpeza(arquivos_apagar))
+
+    return JsonResponse(
+        {"success": True, "id": registro.id, "finalizado": registro.finalizado},
+        status=201 if not registro_id else 200,
+    )
+
+
+def _apagar_arquivos_limpeza(nomes):
+    storage = RegistroLimpezaPinturaEtapa._meta.get_field("imagem").storage
+    for nome in nomes:
+        try:
+            storage.delete(nome)
+        except Exception:
+            pass
+
+
+MAX_REINSPECOES_LIMPEZA = 50
+
+
+def _etapas_registro_limpeza(request, parcial, etapas_com_foto_salva):
+    """Lê as etapas do fluxo de limpeza, em ordem, até a última:
+    etapa 0 = inspeção ("limpeza"), 1, 2... = reinspeções ("etapa_<n>_resultado").
+    Não conforme pede "etapa_<n>_imagem" (trapos não conformes) e
+    "etapa_<n>_nova_limpeza" (sim = segue para a próxima reinspeção);
+    reinspeção conforme pede "etapa_<n>_imagem" (trapos conformes) e encerra.
+    Foto já salva (etapas_com_foto_salva) conta. No parcial, para onde o
+    fluxo ainda não foi respondido, sem acusar o que falta.
+    Devolve (etapas, erro)."""
+    etapas = []
+    numero = 0
+    while True:
+        rotulo = "a limpeza" if numero == 0 else f"a {numero}ª reinspeção da limpeza"
+        resultado = request.POST.get("limpeza" if numero == 0 else f"etapa_{numero}_resultado")
+        if resultado not in ("conforme", "nao_conforme"):
+            if parcial:
+                return etapas, None
+            return None, f"Informe se {rotulo} está conforme ou não conforme."
+        conforme = resultado == "conforme"
+        imagem = request.FILES.get(f"etapa_{numero}_imagem")
+        tem_foto = bool(imagem) or numero in etapas_com_foto_salva
+        # a inspeção conforme não tem foto: descarta alguma que tenha ficado
+        etapa = {"conforme": conforme, "imagem": imagem, "nova_limpeza": None,
+                 "sem_imagem": conforme and numero == 0}
+
+        if conforme:
+            if numero > 0 and not tem_foto and not parcial:
+                return None, f"Anexe a foto dos trapos conformes na {numero}ª reinspeção."
+            if numero == 0:
+                etapa["imagem"] = None
+            etapas.append(etapa)
+            return etapas, None
+
+        if not tem_foto and not parcial:
+            return None, (
+                "Anexe a foto dos trapos não conformes."
+                if numero == 0 else f"Anexe a foto dos trapos não conformes na {numero}ª reinspeção."
+            )
+        nova_limpeza = request.POST.get(f"etapa_{numero}_nova_limpeza")
+        if nova_limpeza not in ("sim", "nao"):
+            if parcial:
+                etapas.append(etapa)
+                return etapas, None
+            return None, "Informe se direciona para nova limpeza."
+        etapa["nova_limpeza"] = nova_limpeza == "sim"
+        etapas.append(etapa)
+        if not etapa["nova_limpeza"]:
+            return etapas, None
+
+        numero += 1
+        if numero > MAX_REINSPECOES_LIMPEZA:
+            return None, f"Limite de {MAX_REINSPECOES_LIMPEZA} reinspeções atingido."
 
 
 def listar_analises_banho_ezinger(request):
@@ -331,6 +756,23 @@ def alerta_itens_pintura(request):
     return JsonResponse(data)
 
 
+def _filtrar_producao_e_carga(queryset, params):
+    """Filtros de período das abas de inspeção da pintura: data de produção
+    (apontamento da peça na pintura) e data de carga da ordem. Cada um tem o
+    seu intervalo e todos podem ser usados ao mesmo tempo (somam)."""
+    campos = (
+        ("producao_inicio", "pecas_ordem_pintura__data__date__gte"),
+        ("producao_fim", "pecas_ordem_pintura__data__date__lte"),
+        ("carga_inicio", "pecas_ordem_pintura__ordem__data_carga__gte"),
+        ("carga_fim", "pecas_ordem_pintura__ordem__data_carga__lte"),
+    )
+    for parametro, lookup in campos:
+        valor = (params.get(parametro) or "").strip()
+        if valor:
+            queryset = queryset.filter(**{lookup: valor})
+    return queryset
+
+
 def get_itens_inspecao_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
@@ -369,6 +811,8 @@ def get_itens_inspecao_pintura(request):
     if tipos_tinta_filtradas:
         datas = datas.filter(pecas_ordem_pintura__tipo__in=tipos_tinta_filtradas)
 
+    datas = _filtrar_producao_e_carga(datas, request.GET)
+
     if not data_fim:
         data_fim = data_inicio
 
@@ -396,6 +840,9 @@ def get_itens_inspecao_pintura(request):
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    # Inspeções com "Salvar parcial" no servidor (selo "Parcial" no card)
+    com_rascunho = ids_com_rascunho([data.id for data in pagina_obj])
+
     dados = []
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
@@ -417,6 +864,7 @@ def get_itens_inspecao_pintura(request):
             "qtd_apontada": data.pecas_ordem_pintura.qtd_boa,
             "tipo": data.pecas_ordem_pintura.tipo,
             "operador": matricula_nome_operador,
+            "parcial": data.id in com_rascunho,
         }
 
         dados.append(item)
@@ -491,7 +939,7 @@ def get_itens_reinspecao_pintura(request):
     data_inicio = params.get("data_inicio")
     data_fim = params.get("data_fim")
 
-    print(data_inicio)
+    queryset = _filtrar_producao_e_carga(queryset, request.GET)
 
     if data_inicio and not data_fim:
         data_fim = data_inicio
@@ -654,6 +1102,8 @@ def get_itens_inspecionados_pintura(request):
         ultima_data_execucao=Max("dadosexecucaoinspecao__data_execucao")
     )
 
+    datas = _filtrar_producao_e_carga(datas, request.GET)
+
     if data_inicio and data_fim:
         datas = datas.filter(
             ultima_data_execucao__date__gte=data_inicio,
@@ -696,31 +1146,48 @@ def get_itens_inspecionados_pintura(request):
                 dadosexecucaoinspecao__num_execucao=0,
             )
 
+    # Filtro "Reinspecionadas": so as que passaram pela reinspecao de fato -
+    # concluida e com execucao de reinspecao (num_execucao > 0). Fica de fora a
+    # reinspecao fechada automaticamente quando a peca vai pra sucata.
+    if request.GET.get("reinspecionadas") == "1":
+        datas = datas.filter(
+            id__in=Reinspecao.objects.filter(reinspecionado=True).values("inspecao")
+        ).filter(
+            id__in=DadosExecucaoInspecao.objects.filter(num_execucao__gt=0).values("inspecao")
+        )
+
     datas = datas.select_related(
         "pecas_ordem_pintura",
         "pecas_ordem_pintura__ordem",
         "pecas_ordem_pintura__operador_fim",
-    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    ).order_by("-ultima_data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    dados_execucao = DadosExecucaoInspecao.objects.filter(
+        inspecao__in=pagina_obj
+    ).select_related("inspetor__user").order_by("data_execucao")
+
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução.
+    # Itera em ordem crescente de data_execucao e vai sobrescrevendo, entao
+    # a ultima escrita por inspecao_id e sempre a execucao mais recente (ex:
+    # a reinspecao, quando existir, prevalece sobre a inspecao original).
+    dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
+
     dados = []
     for data in pagina_obj:
-        data_ajustada = DadosExecucaoInspecao.objects.filter(inspecao=data).values_list(
-            "data_execucao", flat=True
-        ).last() - timedelta(hours=3)
+        de = dados_execucao_dict.get(data.id)
+        if not de:
+            continue
 
-        possui_nao_conformidade = DadosExecucaoInspecao.objects.filter(
-            inspecao=data, nao_conformidade__gt=0
-        ).exists()
+        data_ajustada = de.data_execucao - timedelta(hours=3)
+        possui_nao_conformidade = de.nao_conformidade > 0
 
         item = {
             "id": data.id,
-            "id_dados_execucao": DadosExecucaoInspecao.objects.filter(inspecao=data)
-            .values_list("id", flat=True)
-            .first(),
+            "id_dados_execucao": de.id,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
             "data_carga": (
                 data.pecas_ordem_pintura.ordem.data_carga.strftime("%d/%m/%Y")
@@ -730,10 +1197,10 @@ def get_itens_inspecionados_pintura(request):
             "peca": data.pecas_ordem_pintura.peca,
             "cor": data.pecas_ordem_pintura.ordem.cor,
             "tipo": data.pecas_ordem_pintura.tipo,
-            "inspetor": DadosExecucaoInspecao.objects.filter(inspecao=data)
-            .values_list("inspetor__user__username", flat=True)
-            .first(),
+            "inspetor": de.inspetor.user.username if de.inspetor else None,
             "possui_nao_conformidade": possui_nao_conformidade,
+            "conformidade": de.conformidade,
+            "nao_conformidade": de.nao_conformidade,
         }
 
         dados.append(item)
@@ -754,30 +1221,101 @@ def get_historico_pintura(request, id):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Otimiza a consulta usando select_related para trazer dados relacionados
+    inspecao = (
+        Inspecao.objects
+        .select_related(
+            "pecas_ordem_pintura",
+            "pecas_ordem_pintura__ordem",
+            "pecas_ordem_pintura__operador_fim",
+        )
+        .filter(pk=id)
+        .first()
+    )
+    if inspecao is None:
+        return JsonResponse({"error": "Inspeção não encontrada"}, status=404)
+
+    peca_info = None
+    peca_ordem = inspecao.pecas_ordem_pintura
+    if peca_ordem is not None:
+        ordem = peca_ordem.ordem
+        peca_info = {
+            "peca": peca_ordem.peca,
+            "ordem": ordem.ordem if ordem else None,
+            "cor": ordem.cor if ordem else None,
+            "maquina": ordem.maquina if ordem else None,
+            "tipo": peca_ordem.tipo,
+            "qtd_planejada": peca_ordem.qtd_planejada,
+            "qtd_boa": peca_ordem.qtd_boa,
+            "qtd_morta": peca_ordem.qtd_morta,
+            "operador_fim": (
+                f"{peca_ordem.operador_fim.matricula} - {peca_ordem.operador_fim.nome}"
+                if peca_ordem.operador_fim
+                else None
+            ),
+            "data_carga": (
+                (ordem.data_carga - timedelta(hours=3)).strftime("%d/%m/%Y")
+                if ordem and ordem.data_carga
+                else None
+            ),
+        }
+
+    # Otimiza a consulta usando select_related/prefetch_related para trazer
+    # tudo de uma vez (causas, imagens de nao conformidade e de conformidade)
+    # ao inves de exigir uma requisicao extra por execucao pra montar a tela.
     dados = (
         DadosExecucaoInspecao.objects.filter(inspecao__id=id)
         .select_related("inspetor__user")
+        .prefetch_related(
+            "causasnaoconformidade_set__causa",
+            "causasnaoconformidade_set__arquivos",
+        )
         .order_by("-id")
     )
 
-    # Usa list comprehension para construir a lista de histórico
-    list_history = [
-        {
-            "id": dado.id,
-            "id_inspecao": id,
-            "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
-                "%d/%m/%Y %H:%M:%S"
-            ),
-            "num_execucao": dado.num_execucao,
-            "conformidade": dado.conformidade,
-            "nao_conformidade": dado.nao_conformidade,
-            "inspetor": dado.inspetor.user.username,  # Já está otimizado com select_related
-        }
-        for dado in dados
-    ]
+    ids_execucao = [dado.id for dado in dados]
+    imagens_conformidade_por_execucao = defaultdict(list)
+    for arquivo in ArquivoConformidade.objects.filter(dados_execucao_id__in=ids_execucao):
+        if arquivo.arquivo:
+            imagens_conformidade_por_execucao[arquivo.dados_execucao_id].append(
+                {"url": arquivo.arquivo.url}
+            )
 
-    return JsonResponse({"history": list_history}, status=200)
+    list_history = []
+    for dado in dados:
+        causas = []
+        for cnc in dado.causasnaoconformidade_set.all():
+            imagens = [
+                {"url": arquivo.arquivo.url}
+                for arquivo in cnc.arquivos.all()
+                if arquivo.arquivo
+            ]
+            causas_relacionadas = list(cnc.causa.all())
+            causas.append(
+                {
+                    "nomes": [causa.nome for causa in causas_relacionadas],
+                    "setor": causas_relacionadas[0].setor if causas_relacionadas else None,
+                    "quantidade": cnc.quantidade,
+                    "imagens": imagens,
+                }
+            )
+
+        list_history.append(
+            {
+                "id": dado.id,
+                "id_inspecao": id,
+                "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
+                    "%d/%m/%Y %H:%M:%S"
+                ),
+                "num_execucao": dado.num_execucao,
+                "conformidade": dado.conformidade,
+                "nao_conformidade": dado.nao_conformidade,
+                "inspetor": dado.inspetor.user.username,  # Já está otimizado com select_related
+                "causas": causas,
+                "imagens_conformidade": imagens_conformidade_por_execucao.get(dado.id, []),
+            }
+        )
+
+    return JsonResponse({"history": list_history, "peca_info": peca_info}, status=200)
 
 
 def get_historico_causas_pintura(request, id):
@@ -835,6 +1373,33 @@ def get_imagens_causas_conformidades_pintura(request, id, num_execucao):
 
     return JsonResponse({'imagens': imagens})
 
+def _erro_foto_obrigatoria_pintura(request, campo_nao_conformidade, nome_causas, nome_imagens, nome_fotos_rascunho=None):
+    """Toda nao conformidade da pintura exige foto: cada bloco de causa
+    precisa de ao menos uma imagem. nome_causas/nome_imagens recebem o
+    indice do bloco (ex: "causas_{}" / "imagens_{}"). nome_fotos_rascunho:
+    ids de fotos ja salvas no "Salvar parcial", que tambem contam. Devolve a
+    mensagem de erro ou None."""
+    try:
+        if int(request.POST.get(campo_nao_conformidade) or 0) <= 0:
+            return None
+        total = int(request.POST.get("quantidade-total-causas") or 0)
+    except ValueError:
+        return None
+
+    sem_foto = []
+    for i in range(1, total + 1):
+        fotos_rascunho = request.POST.getlist(nome_fotos_rascunho.format(i)) if nome_fotos_rascunho else []
+        if not request.FILES.getlist(nome_imagens.format(i)) and not fotos_rascunho:
+            nomes = Causas.objects.filter(
+                id__in=request.POST.getlist(nome_causas.format(i))
+            ).values_list("nome", flat=True)
+            sem_foto.append(f"{i}ª causa ({', '.join(nomes)})" if nomes else f"{i}ª causa")
+
+    if sem_foto:
+        return "Foto obrigatória em toda não conformidade. Faltando em: " + "; ".join(sem_foto) + "."
+    return None
+
+
 def envio_inspecao_pintura(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
@@ -843,6 +1408,14 @@ def envio_inspecao_pintura(request):
     # Verifica se já existe uma inspeção com o mesmo ID
     if DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).exists():
         return JsonResponse({"error": "Item já inspecionado."}, status=400)
+
+    # o campo de arquivo do formulario (imagens_N) e o que o backend grava;
+    # fotos_rascunho_N = fotos ja salvas no "Salvar parcial"
+    erro_foto = _erro_foto_obrigatoria_pintura(
+        request, "nao-conformidade-inspecao-pintura", "causas_{}", "imagens_{}", "fotos_rascunho_{}"
+    )
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():
@@ -903,15 +1476,36 @@ def envio_inspecao_pintura(request):
                             arquivo=imagem,
                         )
 
+                    # Fotos ja salvas no "Salvar parcial": reaproveita o arquivo
+                    # (mesmo storage/pasta), sem novo upload
+                    anexar_fotos_rascunho(
+                        inspecao, causa_nao_conformidade, request.POST.getlist(f"fotos_rascunho_{i}")
+                    )
+
+            encerrar_rascunho(inspecao, dados_execucao)
+
         return JsonResponse({"success": True})
 
     except Exception as e:
         return JsonResponse({"error": e}, status=400)
 
 
+def rascunho_inspecao_pintura(request, id):
+    """"Salvar parcial" da inspeção de pintura (lote que chega em partes),
+    guardado no servidor pra continuar de qualquer aparelho."""
+    inspecao = get_object_or_404(Inspecao, pk=id, pecas_ordem_pintura__isnull=False)
+    return responder_rascunho(request, inspecao)
+
+
 def envio_reinspecao_pintura(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    erro_foto = _erro_foto_obrigatoria_pintura(
+        request, "nao-conformidade-reinspecao-pintura", "causas_reinspecao_{}[]", "imagens_reinspecao_{}[]"
+    )
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():

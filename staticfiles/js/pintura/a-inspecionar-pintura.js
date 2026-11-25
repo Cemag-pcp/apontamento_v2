@@ -30,7 +30,6 @@ function buscarItensInspecao(pagina) {
     let itensInspecionar = document.getElementById("itens-inspecionar");
     let itensFiltradosCor = document.getElementById("itens-filtrados-inspecao-cor");
     let itensFiltradosTipos = document.getElementById("itens-filtrados-inspecao-tipos");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
     let paginacao = document.getElementById("paginacao-inspecao-pintura");
 
@@ -54,8 +53,6 @@ function buscarItensInspecao(pagina) {
         }
     });
 
-    let dataInicio = document.getElementById('data-filtro-inspecao-inicio').value;
-    let dataFim = document.getElementById('data-filtro-inspecao-fim').value;
 
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
@@ -77,21 +74,9 @@ function buscarItensInspecao(pagina) {
         itensFiltradosTipos.style.display = "none";
     }
 
-    if (dataInicio) {
-        params.append("data_inicio", dataInicio);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "De: " + dataInicio;
-    } else {
-        itensFiltradosData.style.display = "none";
-    }
-
-    if (dataFim) {
-        params.append("data_fim", dataFim);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Até: " + dataFim;
-    } else {
-        itensFiltradosData.style.display = "none";
-    }
+    // periodos: producao e carga (podem ser usados juntos)
+    aplicarFiltroPeriodo(params, { campo: 'producao-filtro-inspecao', param: 'producao', rotulo: 'Produção', chip: 'itens-filtrados-inspecao-producao' });
+    aplicarFiltroPeriodo(params, { campo: 'carga-filtro-inspecao', param: 'carga', rotulo: 'Carga', chip: 'itens-filtrados-inspecao-carga' });
 
     if (pesquisarInspecao) {
         params.append("pesquisar", pesquisarInspecao);
@@ -142,7 +127,7 @@ function buscarItensInspecao(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
+                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a>${item.parcial ? ' <span class="badge bg-warning text-dark" title="Inspeção salva parcialmente">Parcial</span>' : ''}</h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
@@ -161,7 +146,7 @@ function buscarItensInspecao(pagina) {
                         data-cor="${item.cor}"
                         data-peca="${item.peca}"
                     class="btn btn-dark w-100 iniciar-inspecao">
-                    Iniciar Inspeção</button>
+                    ${item.parcial ? 'Continuar Inspeção' : 'Iniciar Inspeção'}</button>
                 </div>
             </div>`;
 

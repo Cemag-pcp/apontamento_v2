@@ -86,6 +86,10 @@ function buscarItensInspecionadosEstanqueidade(pagina) {
         itensFiltradosInspetor.style.display = "none";
     }
 
+    // Somente inspecoes que passaram pela reinspecao
+    if (document.getElementById('filter-itens-reinspecionadas')?.checked) {
+        params.append("reinspecionadas", "1");
+    }
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
     fetch(`/inspecao/api/itens-inspecionados-tubos-cilindros/?${params.toString()}`, {
