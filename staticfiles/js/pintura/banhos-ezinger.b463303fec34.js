@@ -16,6 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const acumuladoChartCanvas = document.getElementById("ezinger-acumulado-chart");
     const consumoMensalChartCanvas = document.getElementById("ezinger-consumo-mensal-chart");
     const paginacaoContainer = document.getElementById("ezinger-paginacao");
+    const medicaoForm = document.getElementById("form-medicao-ezinger");
+    const medicaoModalElement = document.getElementById("modal-medicao-ezinger");
+    const medicaoRegistroIdInput = document.getElementById("medicao_registro_id");
+    const medicaoSpinner = document.getElementById("spinner-medicao-ezinger");
+    const medicaoTextoBotao = document.getElementById("texto-botao-medicao-ezinger");
+    const MEDICAO_TEXTO_PADRAO = "Registrar Medição";
     let percentuaisChart = null;
     let acumuladoChart = null;
     let consumoMensalChart = null;
@@ -62,6 +68,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const formatPercent = (value) => `${formatNumber(value)}%`;
+    const NA = '<span class="text-muted">N/A</span>';
+    const isMedicao = (item) => item.tipo === "medicao";
+    const somenteAnalises = (dados) => dados.filter((item) => !isMedicao(item));
+    const escapeHtml = (value) => String(value ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const badgeTipo = (item) => isMedicao(item)
+        ? '<span class="badge text-bg-info">Medição de banho</span>'
+        : '<span class="badge text-bg-secondary">Análise de banho</span>';
+    // celula da analise: medicao nao tem esses valores (N/A)
+    const celulaAnalise = (item, value, formatter, vazio = "-") => {
+        if (isMedicao(item)) return NA;
+        return value !== null && value !== undefined ? formatter(value) : vazio;
+    };
+    const celulaMedicao = (item, value) => (
+        isMedicao(item) && value !== null && value !== undefined ? formatNumber(value) : NA
+    );
     const getCurrentDateTimeLocal = () => {
         const now = new Date();
         const offset = now.getTimezoneOffset();
@@ -242,7 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!dados.length) {
             registrosBody.innerHTML = `
                 <tr>
-                    <td colspan="13" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
+                    <td colspan="17" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
                 </tr>
             `;
             renderPagination(0);
@@ -260,22 +282,27 @@ document.addEventListener("DOMContentLoaded", () => {
         registrosBody.innerHTML = paginaDados.map((item) => `
             <tr>
                 <td>${item.registrado_em}</td>
-                <td>${item.registrado_por}</td>
-                <td>${item.observacao ?? "-"}</td>
-                <td>${item.desengraxante_media !== null ? formatNumber(item.desengraxante_media) : "-"}</td>
-                <td>${item.desengraxante_acumulado !== null ? formatNumber(item.desengraxante_acumulado) : "-"}</td>
-                <td>${item.ak_l95_atual !== null ? formatPercent(item.ak_l95_atual) : "-"}</td>
-                <td>${item.fosfatizante_media !== null ? formatNumber(item.fosfatizante_media) : "-"}</td>
-                <td>${item.fosfatizante_acumulado !== null ? formatNumber(item.fosfatizante_acumulado) : "-"}</td>
-                <td>${item.m_fe_212_atual !== null ? formatPercent(item.m_fe_212_atual) : "-"}</td>
-                <td>${item.ak_l95_adicionar !== null ? formatNumber(item.ak_l95_adicionar) : "Limite acima do especificado"}</td>
-                <td>${item.aditivo_adicionar !== null ? formatNumber(item.aditivo_adicionar) : "Limite acima do especificado"}</td>
-                <td>${item.m_fe_212_adicionar !== null ? formatNumber(item.m_fe_212_adicionar) : "Limite acima do especificado"}</td>
+                <td>${badgeTipo(item)}</td>
+                <td>${isMedicao(item) ? escapeHtml(item.tanque_display || "-") : NA}</td>
+                <td>${celulaMedicao(item, item.pressao_bicos)}</td>
+                <td>${celulaMedicao(item, item.temperatura)}</td>
+                <td>${escapeHtml(item.registrado_por)}</td>
+                <td>${isMedicao(item) ? NA : escapeHtml(item.observacao ?? "-")}</td>
+                <td>${celulaAnalise(item, item.desengraxante_media, formatNumber)}</td>
+                <td>${celulaAnalise(item, item.desengraxante_acumulado, formatNumber)}</td>
+                <td>${celulaAnalise(item, item.ak_l95_atual, formatPercent)}</td>
+                <td>${celulaAnalise(item, item.fosfatizante_media, formatNumber)}</td>
+                <td>${celulaAnalise(item, item.fosfatizante_acumulado, formatNumber)}</td>
+                <td>${celulaAnalise(item, item.m_fe_212_atual, formatPercent)}</td>
+                <td>${celulaAnalise(item, item.ak_l95_adicionar, formatNumber, "Limite acima do especificado")}</td>
+                <td>${celulaAnalise(item, item.aditivo_adicionar, formatNumber, "Limite acima do especificado")}</td>
+                <td>${celulaAnalise(item, item.m_fe_212_adicionar, formatNumber, "Limite acima do especificado")}</td>
                 <td>
                     <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-outline-primary btn-sm ezinger-editar" data-id="${item.id}">
+                    <button type="button" class="btn btn-outline-primary btn-sm ${isMedicao(item) ? "ezinger-editar-medicao" : "ezinger-editar"}" data-id="${item.id}">
                         Editar
                     </button>
+                    ${isMedicao(item) ? "" : `
                     <button
                         type="button"
                         class="btn btn-sm ${item.adicao_registrada ? "btn-outline-success" : "btn-outline-secondary"} ezinger-registrar-adicao"
@@ -284,7 +311,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         ${item.adicao_registrada ? "disabled" : ""}
                     >
                         <i class="bi ${item.adicao_registrada ? "bi-check-circle-fill" : "bi-plus-circle"}"></i>
-                    </button>
+                    </button>`}
                     </div>
                 </td>
             </tr>
@@ -316,6 +343,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const modal = new bootstrap.Modal(modalElement);
                 modal.show();
+            });
+        });
+
+        registrosBody.querySelectorAll(".ezinger-editar-medicao").forEach((button) => {
+            button.addEventListener("click", () => {
+                const item = registros.find((registro) => String(registro.id) === button.dataset.id);
+                if (!item || !medicaoForm || !medicaoModalElement) {
+                    return;
+                }
+                const [dataParte, horaParte] = parsePtBrDateTimeToLocalInput(item.registrado_em).split("T");
+                medicaoRegistroIdInput.value = item.id;
+                document.getElementById("medicao_tanque").value = item.tanque || "";
+                document.getElementById("medicao_data_coleta").value = dataParte;
+                document.getElementById("medicao_horario").value = horaParte;
+                document.getElementById("medicao_pressao_bicos").value = item.pressao_bicos ?? "";
+                document.getElementById("medicao_temperatura").value = item.temperatura ?? "";
+                medicaoTextoBotao.textContent = "Salvar edição";
+                bootstrap.Modal.getOrCreateInstance(medicaoModalElement).show();
             });
         });
 
@@ -659,7 +704,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const loadRecords = async () => {
         registrosBody.innerHTML = `
             <tr>
-                <td colspan="13" class="text-center text-muted py-4">Carregando registros...</td>
+                <td colspan="17" class="text-center text-muted py-4">Carregando registros...</td>
             </tr>
         `;
 
@@ -674,13 +719,15 @@ document.addEventListener("DOMContentLoaded", () => {
             registros = result.dados || [];
             paginaAtual = 1;
             renderRows(registros);
-            renderChart(registros);
-            renderAccumulatedChart(registros);
-            renderMonthlyConsumptionChart(registros);
+            // medicoes nao entram nos graficos da analise de banho
+            const analises = somenteAnalises(registros);
+            renderChart(analises);
+            renderAccumulatedChart(analises);
+            renderMonthlyConsumptionChart(analises);
         } catch (error) {
             registrosBody.innerHTML = `
                 <tr>
-                    <td colspan="13" class="text-center text-danger py-4">${error.message}</td>
+                    <td colspan="17" class="text-center text-danger py-4">${error.message}</td>
                 </tr>
             `;
             registros = [];
@@ -850,6 +897,76 @@ document.addEventListener("DOMContentLoaded", () => {
             if (confirmarRegistrarAdicaoButton) {
                 confirmarRegistrarAdicaoButton.disabled = false;
             }
+        });
+    }
+
+    const preencherDataHoraMedicao = () => {
+        const [dataParte, horaParte] = getCurrentDateTimeLocal().split("T");
+        document.getElementById("medicao_data_coleta").value = dataParte;
+        document.getElementById("medicao_horario").value = horaParte;
+    };
+
+    if (medicaoForm && medicaoModalElement) {
+        medicaoForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (!medicaoForm.checkValidity()) {
+                medicaoForm.classList.add("was-validated");
+                return;
+            }
+
+            const editando = Boolean(medicaoRegistroIdInput.value);
+            const botao = document.getElementById("salvar-medicao-ezinger");
+            botao.disabled = true;
+            medicaoSpinner.classList.remove("d-none");
+            medicaoTextoBotao.textContent = "Salvando...";
+
+            try {
+                const response = await fetch("/inspecao/api/banhos-ezinger/salvar-medicao/", {
+                    method: "POST",
+                    headers: { "X-CSRFToken": getCsrfToken() },
+                    body: new FormData(medicaoForm),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || "Erro ao registrar medição.");
+                }
+
+                bootstrap.Modal.getInstance(medicaoModalElement)?.hide();
+                await loadRecords();
+
+                if (typeof Swal !== "undefined") {
+                    Swal.fire({
+                        icon: "success",
+                        title: editando ? "Medição atualizada com sucesso" : "Medição registrada com sucesso",
+                        timer: 1800,
+                        showConfirmButton: false,
+                    });
+                }
+            } catch (error) {
+                if (typeof Swal !== "undefined") {
+                    Swal.fire({ icon: "error", title: "Erro ao salvar medição", text: error.message });
+                } else {
+                    window.alert(error.message);
+                }
+            } finally {
+                botao.disabled = false;
+                medicaoSpinner.classList.add("d-none");
+                medicaoTextoBotao.textContent = editando ? "Salvar edição" : MEDICAO_TEXTO_PADRAO;
+            }
+        });
+
+        // nova medicao abre com data e hora de agora
+        medicaoModalElement.addEventListener("show.bs.modal", () => {
+            if (!medicaoRegistroIdInput.value) {
+                preencherDataHoraMedicao();
+            }
+        });
+
+        medicaoModalElement.addEventListener("hidden.bs.modal", () => {
+            medicaoForm.reset();
+            medicaoForm.classList.remove("was-validated");
+            medicaoRegistroIdInput.value = "";
+            medicaoTextoBotao.textContent = MEDICAO_TEXTO_PADRAO;
         });
     }
 
