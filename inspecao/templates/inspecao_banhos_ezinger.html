@@ -16,9 +16,14 @@
         <h2 class="my-0">Dados de Análise de Banhos - EZINGER</h2>
         <p class="text-muted mb-0 mt-2">Registro das amostras, concentração atual e quantidade sugerida para correção.</p>
     </div>
-    <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#modal-banho-ezinger">
-        Registrar banho
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-dark" type="button" data-bs-toggle="modal" data-bs-target="#modal-medicao-ezinger">
+            <i class="bi bi-thermometer-half"></i> Nova medição
+        </button>
+        <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#modal-banho-ezinger">
+            Registrar banho
+        </button>
+    </div>
 </div>
 
 <section class="card shadow-sm border-0 mb-4">
@@ -49,6 +54,10 @@
                 <thead>
                     <tr>
                         <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Tanque</th>
+                        <th>Pressão bicos (bar/kgf)</th>
+                        <th>Temp. (°C)</th>
                         <th>Registrado por</th>
                         <th>Obs.</th>
                         <th>HCl (ml)</th>
@@ -65,7 +74,7 @@
                 </thead>
                 <tbody id="ezinger-registros-body">
                     <tr>
-                        <td colspan="13" class="text-center text-muted py-4">Carregando registros...</td>
+                        <td colspan="17" class="text-center text-muted py-4">Carregando registros...</td>
                     </tr>
                 </tbody>
             </table>
@@ -76,6 +85,7 @@
 </section>
 
 {% include 'modal_inspecao/modal_banho_ezinger.html' %}
+{% include 'modal_inspecao/modal_medicao_ezinger.html' %}
 
 <div class="modal fade" id="modal-registrar-adicao-ezinger" tabindex="-1" aria-labelledby="modal-registrar-adicao-ezinger-label" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -104,5 +114,5 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{% static 'js/pintura/banhos-ezinger.js' %}?v=20260422-1"></script>
+<script src="{% static 'js/pintura/banhos-ezinger.js' %}?v=20261125-1"></script>
 {% endblock %}

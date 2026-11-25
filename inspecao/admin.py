@@ -104,6 +104,10 @@ class AnaliseBanhoEzingerAdmin(ProfilePermissionMixin, admin.ModelAdmin):
     list_display = (
         "id",
         "registrado_em",
+        "tipo",
+        "tanque",
+        "pressao_bicos",
+        "temperatura",
         "registrado_por",
         "adicao_registrada_em",
         "adicao_registrada_por",
@@ -117,6 +121,7 @@ class AnaliseBanhoEzingerAdmin(ProfilePermissionMixin, admin.ModelAdmin):
         "m_fe_212_adicionar",
     )
     list_display_links = ("registrado_em",)
+    list_filter = ("tipo", "tanque")
 
 admin.site.register(Inspecao, InspecaoAdmin)
 admin.site.register(DadosExecucaoInspecao, DadosExecucaoInspecaoAdmin)

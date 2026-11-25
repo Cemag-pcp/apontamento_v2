@@ -581,6 +581,12 @@ def listar_analises_banho_ezinger(request):
     dados = [
         {
             "id": registro.id,
+            "tipo": registro.tipo,
+            "tipo_display": registro.get_tipo_display(),
+            "tanque": registro.tanque,
+            "tanque_display": registro.get_tanque_display() if registro.tanque else None,
+            "pressao_bicos": _decimal_to_float(registro.pressao_bicos),
+            "temperatura": _decimal_to_float(registro.temperatura),
             "registrado_em": (registro.registrado_em - timedelta(hours=3)).strftime(
                 "%d/%m/%Y %H:%M:%S"
             ),
@@ -697,6 +703,8 @@ def salvar_analise_banho_ezinger(request):
             registro = AnaliseBanhoEzinger.objects.get(pk=registro_id)
         except AnaliseBanhoEzinger.DoesNotExist:
             return JsonResponse({"error": "Registro não encontrado."}, status=404)
+        if registro.tipo != AnaliseBanhoEzinger.TIPO_ANALISE:
+            return JsonResponse({"error": "Esse registro é uma medição, não uma análise de banho."}, status=400)
 
         for campo, valor in defaults.items():
             setattr(registro, campo, valor)
@@ -704,6 +712,74 @@ def salvar_analise_banho_ezinger(request):
         return JsonResponse({"success": True, "id": registro.id, "updated": True}, status=200)
 
     registro = AnaliseBanhoEzinger.objects.create(**defaults)
+    return JsonResponse({"success": True, "id": registro.id, "created": True}, status=201)
+
+
+def salvar_medicao_banho_ezinger(request):
+    """Nova medição (coleta operacional) de um tanque: pressão dos bicos e
+    temperatura. Fica na mesma tabela das análises, com tipo="medicao" e os
+    campos da análise vazios."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    registro_id = request.POST.get("registro_id")
+    tanque = (request.POST.get("tanque") or "").strip()
+    if tanque not in dict(AnaliseBanhoEzinger.TANQUE_CHOICES):
+        return JsonResponse({"error": "Selecione o tanque."}, status=400)
+
+    data_coleta = (request.POST.get("data_coleta") or "").strip()
+    horario = (request.POST.get("horario") or "").strip()
+    if not data_coleta or not horario:
+        return JsonResponse({"error": "Informe a data e o horário da coleta."}, status=400)
+    try:
+        data_registro = timezone.make_aware(
+            datetime.strptime(f"{data_coleta} {horario[:5]}", "%Y-%m-%d %H:%M")
+        )
+    except ValueError:
+        return JsonResponse({"error": "Data ou horário da coleta inválido."}, status=400)
+
+    try:
+        pressao_bicos = _parse_decimal(request.POST.get("pressao_bicos"))
+        temperatura = _parse_decimal(request.POST.get("temperatura"))
+    except InvalidOperation:
+        return JsonResponse(
+            {"error": "Informe a pressão dos bicos e a temperatura com valores numéricos."},
+            status=400,
+        )
+    if abs(pressao_bicos) >= 10000 or abs(temperatura) >= 10000:
+        return JsonResponse({"error": "Pressão ou temperatura fora do intervalo permitido."}, status=400)
+
+    perfil = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
+    dados = {
+        "tipo": AnaliseBanhoEzinger.TIPO_MEDICAO,
+        "registrado_em": data_registro,
+        "tanque": tanque,
+        "pressao_bicos": _round_decimal(pressao_bicos),
+        "temperatura": _round_decimal(temperatura),
+    }
+
+    if registro_id:
+        try:
+            registro = AnaliseBanhoEzinger.objects.get(pk=registro_id, tipo=AnaliseBanhoEzinger.TIPO_MEDICAO)
+        except AnaliseBanhoEzinger.DoesNotExist:
+            return JsonResponse({"error": "Medição não encontrada."}, status=404)
+        for campo, valor in dados.items():
+            setattr(registro, campo, valor)
+        registro.save()
+        return JsonResponse({"success": True, "id": registro.id, "updated": True}, status=200)
+
+    # campos da análise ficam vazios (na tabela aparecem como N/A)
+    campos_analise = [
+        "desengraxante_amostra_1", "desengraxante_amostra_2", "desengraxante_amostra_3",
+        "desengraxante_media", "desengraxante_acumulado", "ak_l95_atual",
+        "fosfatizante_amostra_1", "fosfatizante_amostra_2", "fosfatizante_amostra_3",
+        "fosfatizante_media", "fosfatizante_acumulado", "m_fe_212_atual",
+    ]
+    registro = AnaliseBanhoEzinger.objects.create(
+        registrado_por=perfil,
+        **dados,
+        **{campo: None for campo in campos_analise},
+    )
     return JsonResponse({"success": True, "id": registro.id, "created": True}, status=201)
 
 
@@ -719,6 +795,9 @@ def registrar_adicao_banho_ezinger(request):
         registro = AnaliseBanhoEzinger.objects.get(pk=registro_id)
     except AnaliseBanhoEzinger.DoesNotExist:
         return JsonResponse({"error": "Registro não encontrado."}, status=404)
+
+    if registro.tipo != AnaliseBanhoEzinger.TIPO_ANALISE:
+        return JsonResponse({"error": "Medição de banho não tem adição a registrar."}, status=400)
 
     if registro.adicao_registrada_em:
         return JsonResponse(

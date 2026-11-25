@@ -244,6 +244,27 @@ class InspecaoRecebimentoItem(models.Model):
 
 
 class AnaliseBanhoEzinger(models.Model):
+    TIPO_ANALISE = "analise"
+    TIPO_MEDICAO = "medicao"
+    TIPO_CHOICES = [
+        (TIPO_ANALISE, "Análise de banho"),
+        (TIPO_MEDICAO, "Medição de banho"),
+    ]
+    TANQUE_CHOICES = [
+        ("desengraxante", "Desengraxante"),
+        ("fosfatizante", "Fosfatizante"),
+        ("enxague_1", "Enxague 1"),
+        ("enxague_2", "Enxague 2"),
+        ("enxague_3", "Enxague 3"),
+    ]
+
+    # analise: amostras de desengraxante/fosfatizante e quanto adicionar;
+    # medicao: coleta operacional de um tanque (pressao dos bicos e temperatura)
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default=TIPO_ANALISE)
+    tanque = models.CharField(max_length=20, choices=TANQUE_CHOICES, null=True, blank=True)
+    pressao_bicos = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    temperatura = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
     registrado_em = models.DateTimeField(default=timezone.now)
     registrado_por = models.ForeignKey(
         Profile, on_delete=models.SET_NULL, null=True, blank=True
@@ -259,41 +280,41 @@ class AnaliseBanhoEzinger(models.Model):
     adicao_registrada_em = models.DateTimeField(null=True, blank=True)
 
     desengraxante_amostra_1 = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     desengraxante_amostra_2 = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     desengraxante_amostra_3 = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     desengraxante_media = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     desengraxante_acumulado = models.DecimalField(
-        max_digits=8, decimal_places=2, default=Decimal("0.00")
+        max_digits=8, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     ak_l95_atual = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
 
     fosfatizante_amostra_1 = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     fosfatizante_amostra_2 = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     fosfatizante_amostra_3 = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     fosfatizante_media = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     fosfatizante_acumulado = models.DecimalField(
-        max_digits=8, decimal_places=2, default=Decimal("0.00")
+        max_digits=8, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
     m_fe_212_atual = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("0.00")
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
     )
 
     ak_l95_adicionar = models.DecimalField(
