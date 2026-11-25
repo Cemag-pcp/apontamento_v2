@@ -1,6 +1,7 @@
 // Inspeção de Item de Garantia: abas A inspecionar / Reinspeção / Aprovados,
 // modal de inspeção (data, nº da garantia, o que foi verificado, aprovado,
 // inspetor, fotos) e histórico de inspeções do item.
+// Chamado de garantia vem do Ploomes (Funil de Chamados); inspetor = usuário logado.
 // Reprovado volta para "Reinspeção" até ser aprovado.
 
 const API = '/inspecao/api/garantia';
