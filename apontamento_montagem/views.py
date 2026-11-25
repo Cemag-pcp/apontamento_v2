@@ -2683,20 +2683,13 @@ def api_erp_apontamentos_montagem(request):
         .order_by('-data_apontamento', '-id')
     )
 
-    subquery_data_inicio_ordem = (
-        OrdemProcesso.objects
-        .filter(ordem_id=OuterRef('ordem_id'), status='iniciada')
-        .order_by('data_inicio')
-        .values('data_inicio')[:1]
-    )
-
     queryset = (
         PecasOrdem.objects
         .filter(
             qtd_boa__gt=0,
             ordem__grupo_maquina='montagem',
         )
-        .select_related('ordem', 'ordem__maquina', 'ordem__operador_final', 'operador', 'resp_apontamento')
+        .select_related('ordem', 'ordem__ordem_pai', 'ordem__maquina', 'ordem__operador_final', 'operador', 'resp_apontamento')
         .prefetch_related('operadores')
         .annotate(
             # Data real de finalizacao/producao: prioriza a data da transicao
@@ -2710,7 +2703,6 @@ def api_erp_apontamentos_montagem(request):
             ordem_data_apontamento_ref=Subquery(subquery_ordem_apontada.values('data_apontamento')[:1]),
             ordem_chave_apontamento_ref=Subquery(subquery_ordem_apontada.values('chave_apontamento')[:1]),
             ordem_resp_username_ref=Subquery(subquery_ordem_apontada.values('resp_apontamento__username')[:1]),
-            data_inicio_ordem=Subquery(subquery_data_inicio_ordem),
         )
         .filter(data_producao_real__date__gte=date(2026, 6, 24))
         .order_by('data_producao_real', 'id')
@@ -2764,6 +2756,12 @@ def api_erp_apontamentos_montagem(request):
         operadores_lote = list(item.operadores.all()) or ([operador] if operador else [])
         peca_codigo = _extrair_codigo_peca(item.peca)
         peca_descricao = _extrair_descricao_peca(item.peca)
+        # ordem paralela (filha) fica sem data_carga: vale a da principal
+        data_carga = None
+        if item.ordem:
+            data_carga = item.ordem.data_carga
+            if not data_carga and item.ordem.ordem_pai_id:
+                data_carga = item.ordem.ordem_pai.data_carga
 
         itens.append({
             'id': item.id,
@@ -2796,11 +2794,7 @@ def api_erp_apontamentos_montagem(request):
                 if getattr(item, 'ordem_data_apontamento_ref', None)
                 else ''
             ),
-            'data_inicio_ordem': (
-                localtime(item.data_inicio_ordem).strftime('%d/%m/%Y %H:%M')
-                if getattr(item, 'data_inicio_ordem', None)
-                else ''
-            ),
+            'data_carga': data_carga.strftime('%d/%m/%Y') if data_carga else '',
         })
 
     return JsonResponse({
