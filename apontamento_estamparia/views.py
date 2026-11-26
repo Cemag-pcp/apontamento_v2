@@ -1677,7 +1677,20 @@ def retornar_processo(request):
             ordem_process = OrdemProcesso.objects.filter(ordem_id=ordem_id)
 
             ordem_process.delete()
-            
+
+            # A inspeção é criada quando a ordem é iniciada; ao retornar para
+            # "Aguardando Iniciar" ela não pode continuar nas pendências.
+            # Só sai a que ainda não foi inspecionada e aponta para um lote sem
+            # produção (o lote inicial). Lotes de finalização parcial já
+            # produzidos continuam pendentes.
+            Inspecao.objects.filter(
+                pecas_ordem_estamparia__ordem_id=ordem_id,
+                pecas_ordem_estamparia__qtd_boa=0,
+                pecas_ordem_estamparia__qtd_morta=0,
+            ).exclude(
+                id__in=DadosExecucaoInspecao.objects.values('inspecao')
+            ).delete()
+
             updated_count = Ordem.objects.filter(id=ordem_id).update(
                 maquina=None,
                 status_atual='aguardando_iniciar'
