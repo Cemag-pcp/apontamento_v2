@@ -42,6 +42,100 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Monta o conteúdo (células) de uma linha da tabela
+    function renderRowCells(item, config) {
+        return config.columns
+            .map(col => {
+                if (col.key === 'actions') {
+                    return `
+                        <td>
+                            <button 
+                                class="btn btn-primary btn-sm badge" 
+                                onclick="editar('${item.chave}', '${config.type}')">
+                                Editar
+                            </button>
+                            <button 
+                                class="btn btn-danger btn-sm badge" 
+                                onclick="confirmar('${item.chave}', '${config.type}')">
+                                Manual
+                            </button>
+                        </td>
+                    `;
+                }
+                return `<td>${item[col.key] || 'N/A'}</td>`;
+            })
+            .join('');
+    }
+
+    function findRow(config, chave) {
+        const tableBody = document.getElementById(config.tbodyId);
+        if (!tableBody) return null;
+        return tableBody.querySelector(`tr[data-chave="${CSS.escape(String(chave))}"]`);
+    }
+
+    // Estilos do feedback visual da linha (carregando / salvo)
+    if (!document.getElementById('erros-linha-estilos')) {
+        const estilo = document.createElement('style');
+        estilo.id = 'erros-linha-estilos';
+        estilo.textContent = `
+            tr.linha-carregando td { opacity: .45; pointer-events: none; }
+            tr.linha-carregando td.celula-status { opacity: 1; }
+            tr.linha-salva td { background-color: #d1e7dd !important; transition: background-color .3s; }
+        `;
+        document.head.appendChild(estilo);
+    }
+
+    // Coloca/retira o "loading" na linha enquanto o servidor processa
+    function marcarLinhaCarregando(config, chave, carregando, texto = 'Salvando...') {
+        const row = findRow(config, chave);
+        if (!row) return;
+        const celulaAcoes = row.lastElementChild;
+        if (carregando) {
+            row.classList.add('linha-carregando');
+            row.querySelectorAll('button').forEach(btn => { btn.disabled = true; });
+            if (celulaAcoes && !celulaAcoes.querySelector('.linha-spinner')) {
+                celulaAcoes.classList.add('celula-status');
+                celulaAcoes.dataset.htmlOriginal = celulaAcoes.innerHTML;
+                celulaAcoes.innerHTML = `
+                    <span class="linha-spinner text-primary small text-nowrap">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        ${texto}
+                    </span>`;
+            }
+        } else {
+            row.classList.remove('linha-carregando');
+            if (celulaAcoes && celulaAcoes.dataset.htmlOriginal !== undefined) {
+                celulaAcoes.innerHTML = celulaAcoes.dataset.htmlOriginal;
+                delete celulaAcoes.dataset.htmlOriginal;
+                celulaAcoes.classList.remove('celula-status');
+            }
+            row.querySelectorAll('button').forEach(btn => { btn.disabled = false; });
+        }
+    }
+
+    // Atualiza apenas a linha editada, sem recarregar a tabela
+    function atualizarLinha(config, linha) {
+        const row = findRow(config, linha.chave);
+        if (row) {
+            row.classList.remove('linha-carregando');
+            row.innerHTML = renderRowCells(linha, config);
+            // Destaque rápido de "salvo"
+            row.classList.add('linha-salva');
+            setTimeout(() => row.classList.remove('linha-salva'), 1500);
+        }
+    }
+
+    // Remove apenas a linha (ajuste manual tira o item da lista de erros)
+    function removerLinha(config, chave) {
+        const row = findRow(config, chave);
+        if (row) {
+            row.remove();
+            // A paginação é por offset: com um item a menos no servidor,
+            // o próximo lote começa uma posição antes.
+            config.start = Math.max(0, config.start - 1);
+        }
+    }
+
     // Função para buscar itens para uma tabela específica
     function fetchItems(config) {
         if (config.isLoading || !config.hasMoreItems) return;
@@ -69,28 +163,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tableBody = document.getElementById(config.tbodyId);
                 if (!tableBody) return;
                 items.forEach(item => {
+                    // Evita duplicar linha quando o offset recua após remoções
+                    if (findRow(config, item.chave)) return;
                     const row = document.createElement('tr');
-                    row.innerHTML = config.columns
-                        .map(col => {
-                            if (col.key === 'actions') {
-                                return `
-                                    <td>
-                                        <button 
-                                            class="btn btn-primary btn-sm badge" 
-                                            onclick="editar('${item.chave}', '${config.type}')">
-                                            Editar
-                                        </button>
-                                        <button 
-                                            class="btn btn-danger btn-sm badge" 
-                                            onclick="confirmar('${item.chave}', '${config.type}')">
-                                            Manual
-                                        </button>
-                                    </td>
-                                `;
-                            }
-                            return `<td>${item[col.key] || 'N/A'}</td>`;
-                        })
-                        .join('');
+                    row.dataset.chave = item.chave;
+                    row.innerHTML = renderRowCells(item, config);
                     tableBody.appendChild(row);
                 });
     
@@ -151,6 +228,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Enviar form de edição
     document.getElementById('btnSalvarEditar').addEventListener('click', function () {
+        const botao = this;
+        // Evita cliques repetidos enquanto a edição está sendo enviada
+        if (botao.disabled) return;
+        const textoOriginalBotao = botao.innerHTML;
+        botao.disabled = true;
+        botao.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...';
+
         // Captura os dados do formulário
         const formData = new FormData(document.getElementById('formEditar'));
     
@@ -159,7 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.forEach((value, key) => {
             data[key] = value;
         });
-    
+
+        // Fecha o modal na hora e mostra o "loading" na própria linha
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditar')).hide();
+        marcarLinhaCarregando(requisicaoConfig, data.editarChave, true, 'Salvando...');
+
         // Envia os dados para o backend via fetch
         fetch('/almox/api/receber-edicao/', {
             method: 'POST', // Método POST para envio de dados
@@ -180,21 +268,33 @@ document.addEventListener('DOMContentLoaded', () => {
             // Lógica de sucesso, como atualizar a tabela
             console.log('Dados enviados com sucesso:', result);
     
-            // Fecha o modal e atualiza a tabela, se necessário
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditar'));
-            modal.hide();
-
-            resetTable(requisicaoConfig);
+            if (result.linha) {
+                atualizarLinha(requisicaoConfig, result.linha);
+            } else {
+                resetTable(requisicaoConfig);
+            }
 
         })
         .catch(error => {
             // Lógica de erro
+            marcarLinhaCarregando(requisicaoConfig, data.editarChave, false);
             console.error('Erro no envio:', error);
             alert('Ocorreu um erro ao salvar os dados.');
+        })
+        .finally(() => {
+            botao.disabled = false;
+            botao.innerHTML = textoOriginalBotao;
         });
     });
     // Enviar form de confirmação de ajuste manual
     document.getElementById('btnConfirmarManual').addEventListener('click', function () {
+        const botao = this;
+        // Evita cliques repetidos enquanto o ajuste está sendo enviado
+        if (botao.disabled) return;
+        const textoOriginalBotao = botao.innerHTML;
+        botao.disabled = true;
+        botao.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Confirmando...';
+
         // Captura os dados do formulário
         const formData = new FormData(document.getElementById('formEditarManual'));
     
@@ -203,7 +303,11 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.forEach((value, key) => {
             data[key] = value;
         });
-    
+
+        // Fecha o modal na hora e mostra o "loading" na própria linha
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalConfirmar')).hide();
+        marcarLinhaCarregando(requisicaoConfig, data.manualChave, true, 'Confirmando...');
+
         // Envia os dados para o backend via fetch
         fetch('/almox/api/receber-ajuste-manual/', {
             method: 'POST', // Método POST para envio de dados
@@ -224,17 +328,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // Lógica de sucesso, como atualizar a tabela
             console.log('Dados enviados com sucesso:', result);
     
-            // Fecha o modal e atualiza a tabela, se necessário
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmar'));
-            modal.hide();
-
-            resetTable(requisicaoConfig);
+            removerLinha(requisicaoConfig, data.manualChave);
 
         })
         .catch(error => {
             // Lógica de erro
+            marcarLinhaCarregando(requisicaoConfig, data.manualChave, false);
             console.error('Erro no envio:', error);
             alert('Ocorreu um erro ao salvar os dados.');
+        })
+        .finally(() => {
+            botao.disabled = false;
+            botao.innerHTML = textoOriginalBotao;
         });
     });
 
@@ -357,7 +462,7 @@ function editar(chave, type) {
                 }
 
                 // Exibe o modal
-                const modalEditar = new bootstrap.Modal(document.getElementById('modalEditar'));
+                const modalEditar = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditar'));
                 modalEditar.show();
 
                 Swal.close();
@@ -385,7 +490,7 @@ function confirmar(chave, type) {
     document.getElementById('manualTipo').value = type;
     
     // Exibe o modal
-    const modalConfirmar = new bootstrap.Modal(document.getElementById('modalConfirmar'));
+    const modalConfirmar = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalConfirmar'));
     modalConfirmar.show();
 }
 
