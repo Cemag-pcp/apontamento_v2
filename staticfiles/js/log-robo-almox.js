@@ -1,0 +1,222 @@
+// Tela "Log do robô" (almoxarifado): requisições x tentativas do robô no ERP.
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('form-filtros');
+    const tbody = document.getElementById('tbody-log');
+    const btnAnterior = document.getElementById('btn-anterior');
+    const btnProxima = document.getElementById('btn-proxima');
+    let pagina = 1;
+    let totalPaginas = 1;
+
+    const CORES_SITUACAO = {
+        lancada: 'bg-success',
+        erro: 'bg-danger',
+        pendente: 'bg-warning text-dark',
+        manual: 'bg-secondary',
+    };
+
+    function esc(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function isoLocal(d) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    // Período padrão: últimos 7 dias
+    const hoje = new Date();
+    const inicio = new Date(); inicio.setDate(hoje.getDate() - 6);
+    document.getElementById('f-data-fim').value = isoLocal(hoje);
+    document.getElementById('f-data-ini').value = isoLocal(inicio);
+
+    function parametros(extra = {}) {
+        const p = new URLSearchParams();
+        new FormData(form).forEach((v, k) => { if (v) p.set(k, v); });
+        Object.entries(extra).forEach(([k, v]) => p.set(k, v));
+        return p.toString();
+    }
+
+    async function getJSON(url) {
+        const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return resp.json();
+    }
+
+    function marcarKpiAtivo() {
+        const sit = document.getElementById('f-situacao').value;
+        document.querySelectorAll('.kpi.clicavel').forEach(k => {
+            k.classList.toggle('ativo', k.dataset.situacao === sit);
+        });
+    }
+
+    async function carregarResumo() {
+        try {
+            // Os indicadores mostram todas as situações (o filtro de situação só vale para a tabela)
+            const p = new URLSearchParams(parametros());
+            p.delete('situacao');
+            const d = await getJSON(`/almox/api/log-robo/resumo/?${p.toString()}`);
+            const s = d.por_situacao || {};
+            const total = Object.values(s).reduce((a, b) => a + b, 0);
+            document.getElementById('kpi-total').textContent = total;
+            ['lancada', 'erro', 'pendente', 'manual'].forEach(k => {
+                document.getElementById(`kpi-${k}`).textContent = s[k] || 0;
+            });
+            const t = d.totais || {};
+            document.getElementById('kpi-tentativas').textContent = `${t.tentativas || 0} (${t.tentativas_erro || 0})`;
+            document.getElementById('kpi-tentativas-sub').textContent =
+                `${t.com_retentativa || 0} com mais de 1 tentativa · ${t.sem_tentativa || 0} sem tentativa no log`;
+
+            const ulErros = document.getElementById('top-erros');
+            ulErros.innerHTML = (d.top_erros || []).length
+                ? d.top_erros.map(e => `<li><span title="${esc(e.motivo)}">${esc(e.motivo || '(sem mensagem)')} <small class="text-muted">[${esc(e.etapa)}]</small></span><strong>${e.qtd}</strong></li>`).join('')
+                : '<li class="text-muted">Nenhum erro no período</li>';
+
+            const ulItens = document.getElementById('top-itens');
+            ulItens.innerHTML = (d.top_itens || []).length
+                ? d.top_itens.map(i => `<li><span title="${esc(i.item_nome)}">${esc(i.item_codigo)} - ${esc(i.item_nome)}</span><strong>${i.qtd}</strong></li>`).join('')
+                : '<li class="text-muted">Nenhum erro no período</li>';
+
+            // Etapas disponíveis (mantém a seleção)
+            const selEtapa = document.getElementById('f-etapa');
+            const atual = selEtapa.value;
+            selEtapa.innerHTML = '<option value="">Todas</option>' +
+                (d.etapas || []).map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+            selEtapa.value = atual;
+
+            const ex = (d.execucoes || [])[0];
+            document.getElementById('ultima-execucao').innerHTML = ex
+                ? `Última execução do robô: <strong>#${ex.id}</strong> em ${esc(ex.maquina || '-')} · início ${esc(ex.iniciado_em)}` +
+                  (ex.finalizado_em ? ` · fim ${esc(ex.finalizado_em)}` : ' · <span class="text-success">em andamento</span>') +
+                  (ex.status ? ` · ${esc(ex.status)}` : '')
+                : 'Nenhuma execução registrada';
+        } catch (err) {
+            console.error('Erro ao carregar resumo:', err);
+        }
+    }
+
+    async function carregarTabela() {
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span> Carregando...</td></tr>';
+        btnAnterior.disabled = true; btnProxima.disabled = true;
+        try {
+            const d = await getJSON(`/almox/api/log-robo/solicitacoes/?${parametros({ pagina })}`);
+            totalPaginas = d.paginas;
+            document.getElementById('info-total').textContent = `${d.total} requisição(ões)`;
+            document.getElementById('info-pagina').textContent = `Página ${d.pagina} de ${d.paginas}`;
+            btnAnterior.disabled = d.pagina <= 1;
+            btnProxima.disabled = d.pagina >= d.paginas;
+
+            if (!d.dados.length) {
+                tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-4">Nenhuma requisição encontrada</td></tr>';
+                return;
+            }
+            tbody.innerHTML = d.dados.map(r => {
+                const badge = `<span class="badge ${CORES_SITUACAO[r.situacao] || 'bg-light text-dark'}">${esc(r.situacao_display)}</span>`;
+                const ult = r.ultimo_resultado
+                    ? `<span class="badge ${r.ultimo_resultado === 'OK' ? 'bg-success' : 'bg-danger'}">${esc(r.ultimo_resultado)}</span> <small>${esc(r.ultima_tentativa)}</small>`
+                    : '<small class="text-muted">sem tentativa</small>';
+                const msg = r.ultima_mensagem || (r.situacao === 'erro' ? r.rpa : '');
+                return `
+                    <tr class="linha-sol" data-id="${r.id}">
+                        <td>${r.id}</td>
+                        <td class="text-nowrap">${esc(r.data_entrega)}</td>
+                        <td>${esc(r.item)}</td>
+                        <td>${r.quantidade ?? ''}</td>
+                        <td>${esc(r.solicitante)}</td>
+                        <td>${esc(r.cc)}</td>
+                        <td>${badge}</td>
+                        <td>${esc(r.chave) || '<span class="text-muted">-</span>'}</td>
+                        <td class="text-center">${r.qtd_tentativas}${r.qtd_erros ? ` <small class="text-danger">(${r.qtd_erros} erro${r.qtd_erros > 1 ? 's' : ''})</small>` : ''}</td>
+                        <td class="text-nowrap">${ult}</td>
+                        <td>${esc(r.ultima_etapa)}</td>
+                        <td class="msg">${esc(msg)}</td>
+                    </tr>`;
+            }).join('');
+        } catch (err) {
+            console.error('Erro ao carregar tabela:', err);
+            tbody.innerHTML = '<tr><td colspan="12" class="text-center text-danger py-4">Erro ao carregar os dados</td></tr>';
+        }
+    }
+
+    async function abrirTentativas(id) {
+        const corpo = document.getElementById('modalTentativasCorpo');
+        document.getElementById('modalTentativasLabel').textContent = `Tentativas do robô - requisição #${id}`;
+        corpo.innerHTML = '<div class="text-center py-4"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalTentativas')).show();
+        try {
+            const d = await getJSON(`/almox/api/log-robo/solicitacao/${id}/tentativas/`);
+            if (!d.tentativas.length) {
+                corpo.innerHTML = '<p class="text-muted mb-0">O robô ainda não registrou nenhuma tentativa para esta requisição.</p>';
+                return;
+            }
+            corpo.innerHTML = d.tentativas.map((t, i) => {
+                const ok = t.resultado === 'OK';
+                const eventos = t.eventos.length
+                    ? t.eventos.map(e => `<div class="evento nivel-${esc(e.nivel)}"><small class="text-muted">${esc(e.criado_em)}</small> <strong>${esc(e.nivel)}</strong> ${esc(e.mensagem)}${e.detalhe ? `<br><small class="text-muted">${esc(e.detalhe)}</small>` : ''}</div>`).join('')
+                    : '<small class="text-muted">Sem eventos</small>';
+                return `
+                    <div class="card mb-2 ${ok ? 'border-success' : 'border-danger'}">
+                        <div class="card-header d-flex flex-wrap justify-content-between gap-2 py-2">
+                            <span><span class="badge ${ok ? 'bg-success' : 'bg-danger'}">${esc(t.resultado || '-')}</span>
+                                Tentativa #${t.id} ${i === 0 ? '<small class="text-muted">(mais recente)</small>' : ''}</span>
+                            <small class="text-muted">${esc(t.iniciado_em)} → ${esc(t.finalizado_em || '...')}
+                                ${t.duracao_ms != null ? ` · ${(t.duracao_ms / 1000).toFixed(1)}s` : ''}
+                                · execução #${esc(t.execucao_id)} ${t.maquina ? `(${esc(t.maquina)})` : ''}</small>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="small mb-2">
+                                Item <strong>${esc(t.item)}</strong> · Qtd ${t.quantidade ?? ''} · ${esc(t.classe)} ·
+                                Matrícula ${esc(t.matricula)} · ${esc(t.cc)}
+                                ${t.chave_erp ? ` · Chave ERP <strong>${esc(t.chave_erp)}</strong>` : ''}
+                                ${t.etapa_falha ? ` · Etapa da falha <strong>${esc(t.etapa_falha)}</strong>` : ''}
+                            </div>
+                            ${t.mensagem_erro ? `<div class="mb-2"><small class="text-muted">Mensagem de erro</small><pre>${esc(t.mensagem_erro)}</pre></div>` : ''}
+                            ${t.texto_modal ? `<div class="mb-2"><small class="text-muted">Texto do modal do ERP</small><pre>${esc(t.texto_modal)}</pre></div>` : ''}
+                            ${t.screenshot ? `<div class="mb-2 small"><span class="text-muted">Screenshot (na máquina do robô):</span> <code>${esc(t.screenshot)}</code></div>` : ''}
+                            <details><summary class="small">Eventos (${t.eventos.length})</summary><div class="mt-1">${eventos}</div></details>
+                        </div>
+                    </div>`;
+            }).join('');
+        } catch (err) {
+            console.error('Erro ao carregar tentativas:', err);
+            corpo.innerHTML = '<p class="text-danger mb-0">Erro ao carregar as tentativas.</p>';
+        }
+    }
+
+    function recarregarTudo() {
+        pagina = 1;
+        marcarKpiAtivo();
+        carregarResumo();
+        carregarTabela();
+    }
+
+    form.addEventListener('submit', (ev) => { ev.preventDefault(); recarregarTudo(); });
+    document.getElementById('f-situacao').addEventListener('change', () => {
+        pagina = 1;
+        marcarKpiAtivo();
+        carregarTabela();
+    });
+    ['f-resultado', 'f-etapa', 'f-data-ini', 'f-data-fim'].forEach(id => {
+        document.getElementById(id).addEventListener('change', recarregarTudo);
+    });
+
+    document.querySelectorAll('.kpi.clicavel').forEach(k => {
+        k.addEventListener('click', () => {
+            document.getElementById('f-situacao').value = k.dataset.situacao;
+            pagina = 1;
+            marcarKpiAtivo();
+            carregarTabela();
+        });
+    });
+
+    btnAnterior.addEventListener('click', () => { if (pagina > 1) { pagina--; carregarTabela(); } });
+    btnProxima.addEventListener('click', () => { if (pagina < totalPaginas) { pagina++; carregarTabela(); } });
+
+    tbody.addEventListener('click', (ev) => {
+        const tr = ev.target.closest('tr.linha-sol');
+        if (tr) abrirTentativas(tr.dataset.id);
+    });
+
+    recarregarTudo();
+});
