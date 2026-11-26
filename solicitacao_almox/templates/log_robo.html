@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block links %}
+<style>
+    .log-robo .kpi { border-radius: 12px; border: 1px solid #e3e6ea; background: #fff; padding: .9rem 1rem; height: 100%; }
+    .log-robo .kpi .rotulo { font-size: .8rem; color: #6c757d; text-transform: uppercase; letter-spacing: .03em; }
+    .log-robo .kpi .valor { font-size: 1.7rem; font-weight: 700; line-height: 1.2; }
+    .log-robo .kpi.clicavel { cursor: pointer; transition: box-shadow .15s; }
+    .log-robo .kpi.clicavel:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .log-robo .kpi.ativo { outline: 2px solid #0d6efd; }
+    .log-robo .tabela-wrap { max-height: 62vh; overflow: auto; }
+    .log-robo table thead th { position: sticky; top: 0; background: #f8f9fa; z-index: 1; white-space: nowrap; font-size: .85rem; }
+    .log-robo table td { font-size: .85rem; vertical-align: middle; }
+    .log-robo td.msg { max-width: 360px; white-space: normal; word-break: break-word; color: #842029; }
+    .log-robo tr.linha-sol { cursor: pointer; }
+    .log-robo .lista-top li { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; padding: .2rem 0; border-bottom: 1px dashed #eee; }
+    .log-robo .lista-top li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #modalTentativas pre { white-space: pre-wrap; word-break: break-word; font-size: .8rem; background: #f8f9fa; padding: .5rem; border-radius: 6px; margin: 0; }
+    #modalTentativas .evento { font-size: .8rem; border-left: 3px solid #dee2e6; padding: .15rem .5rem; margin-bottom: .15rem; }
+    #modalTentativas .evento.nivel-ERROR, #modalTentativas .evento.nivel-ERRO { border-color: #dc3545; }
+    #modalTentativas .evento.nivel-WARNING, #modalTentativas .evento.nivel-AVISO { border-color: #ffc107; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid log-robo py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h3 class="mb-0">Log do robô de requisições</h3>
+            <small class="text-muted">Requisições entregues no período cruzadas com as tentativas do robô no ERP</small>
+        </div>
+        <div id="ultima-execucao" class="small text-muted text-end"></div>
+    </div>
+
+    <!-- Filtros -->
+    <form id="form-filtros" class="row g-2 align-items-end mb-3">
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0" for="f-data-ini">Entrega de</label>
+            <input type="date" class="form-control form-control-sm" id="f-data-ini" name="data_ini">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0" for="f-data-fim">até</label>
+            <input type="date" class="form-control form-control-sm" id="f-data-fim" name="data_fim">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0" for="f-situacao">Situação</label>
+            <select class="form-select form-select-sm" id="f-situacao" name="situacao">
+                <option value="">Todas</option>
+                {% for valor, nome in situacoes.items %}
+                <option value="{{ valor }}">{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0" for="f-resultado">Última tentativa</label>
+            <select class="form-select form-select-sm" id="f-resultado" name="resultado">
+                <option value="">Todas</option>
+                <option value="OK">OK</option>
+                <option value="ERRO">ERRO</option>
+                <option value="sem_tentativa">Sem tentativa no log</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-1">
+            <label class="form-label small mb-0" for="f-etapa">Etapa</label>
+            <select class="form-select form-select-sm" id="f-etapa" name="etapa">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0" for="f-busca">Buscar</label>
+            <input type="text" class="form-control form-control-sm" id="f-busca" name="busca" placeholder="ID, item, matrícula, chave, erro">
+        </div>
+        <div class="col-12 col-md-1 d-grid">
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Filtrar</button>
+        </div>
+    </form>
+
+    <!-- Indicadores -->
+    <div class="row g-2 mb-3" id="kpis">
+        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao=""><div class="rotulo">Entregues</div><div class="valor" id="kpi-total">-</div></div></div>
+        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="lancada"><div class="rotulo">Lançadas no ERP</div><div class="valor text-success" id="kpi-lancada">-</div></div></div>
+        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="erro"><div class="rotulo">Com erro</div><div class="valor text-danger" id="kpi-erro">-</div></div></div>
+        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="pendente"><div class="rotulo">Pendentes</div><div class="valor text-warning" id="kpi-pendente">-</div></div></div>
+        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="manual"><div class="rotulo">OK manual (sem chave)</div><div class="valor text-secondary" id="kpi-manual">-</div></div></div>
+        <div class="col-6 col-md-2"><div class="kpi"><div class="rotulo">Tentativas (erros)</div><div class="valor" id="kpi-tentativas">-</div><div class="small text-muted" id="kpi-tentativas-sub"></div></div></div>
+    </div>
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-6">
+            <div class="kpi">
+                <div class="rotulo mb-1">Principais motivos de erro</div>
+                <ul class="list-unstyled mb-0 lista-top" id="top-erros"><li class="text-muted">-</li></ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="kpi">
+                <div class="rotulo mb-1">Itens com mais erros</div>
+                <ul class="list-unstyled mb-0 lista-top" id="top-itens"><li class="text-muted">-</li></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <small class="text-muted" id="info-total"></small>
+        <small class="text-muted">Clique na linha para ver todas as tentativas do robô</small>
+    </div>
+    <div class="tabela-wrap border rounded">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Entrega</th>
+                    <th>Item</th>
+                    <th>Qtd</th>
+                    <th>Solicitante</th>
+                    <th>CC</th>
+                    <th>Situação</th>
+                    <th>Chave ERP</th>
+                    <th>Tentativas</th>
+                    <th>Última tentativa</th>
+                    <th>Etapa</th>
+                    <th>Mensagem</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-log">
+                <tr><td colspan="12" class="text-center text-muted py-4">Carregando...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="d-flex justify-content-center align-items-center gap-2 mt-2">
+        <button class="btn btn-outline-secondary btn-sm" id="btn-anterior" disabled>&laquo; Anterior</button>
+        <span class="small" id="info-pagina"></span>
+        <button class="btn btn-outline-secondary btn-sm" id="btn-proxima" disabled>Próxima &raquo;</button>
+    </div>
+</div>
+
+<!-- Modal: tentativas da solicitação -->
+<div class="modal fade" id="modalTentativas" tabindex="-1" aria-labelledby="modalTentativasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTentativasLabel">Tentativas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="modalTentativasCorpo"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/log-robo-almox.js' %}"></script>
+{% endblock %}
