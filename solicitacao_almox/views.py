@@ -1180,6 +1180,35 @@ def home_erros(request):
     return render(request, "erros.html", context)
 
 
+def _linha_erro_transferencia(item):
+    """Linha da tabela de /almox/erros/ (transferência)."""
+    return {
+        "chave": item.pk,
+        "item": f"{item.item.codigo} - {item.item.nome}",
+        "qtd": item.quantidade,
+        "data_solicitacao": item.data_solicitacao,
+        "data_entrega": item.data_entrega,
+        "dep_destino": item.deposito_destino.nome,
+        "solicitante": item.funcionario.nome,
+        "erro": item.rpa,
+    }
+
+
+def _linha_erro_requisicao(item):
+    """Linha da tabela de /almox/erros/ (requisição)."""
+    return {
+        "chave": item.pk,
+        "item": f"{item.item.codigo} - {item.item.nome}",
+        "qtd": item.quantidade,
+        "data_solicitacao": item.data_solicitacao,
+        "data_entrega": item.data_entrega,
+        "classe_req": item.classe_requisicao.nome,
+        "solicitante": item.funcionario.nome,
+        "cc": item.cc.nome,
+        "erro": item.rpa,
+    }
+
+
 def data_erros_transferencia(request):
 
     queryset = SolicitacaoTransferencia.objects.filter(
@@ -1191,17 +1220,7 @@ def data_erros_transferencia(request):
     total = queryset.count()
 
     itens_transferencia_erros = [
-        {
-            "chave": item.pk,
-            "item": f"{item.item.codigo} - {item.item.nome}",
-            "qtd": item.quantidade,
-            "data_solicitacao": item.data_solicitacao,
-            "data_entrega": item.data_entrega,
-            "dep_destino": item.deposito_destino.nome,
-            "solicitante": item.funcionario.nome,
-            "erro": item.rpa,
-        }
-        for item in queryset[start:start + limit]
+        _linha_erro_transferencia(item) for item in queryset[start:start + limit]
     ]
 
     data = {
@@ -1225,18 +1244,7 @@ def data_erros_requisicao(request):
     total = queryset.count()
 
     itens_requisicao_erros = [
-        {
-            "chave": item.pk,
-            "item": f"{item.item.codigo} - {item.item.nome}",
-            "qtd": item.quantidade,
-            "data_solicitacao": item.data_solicitacao,
-            "data_entrega": item.data_entrega,
-            "classe_req": item.classe_requisicao.nome,
-            "solicitante": item.funcionario.nome,
-            "cc": item.cc.nome,
-            "erro": item.rpa,
-        }
-        for item in queryset[start:start + limit]
+        _linha_erro_requisicao(item) for item in queryset[start:start + limit]
     ]
 
     data = {
@@ -1354,8 +1362,13 @@ def receber_edicao(request):
                     ItensTransferencia, pk=recurso, ativo=True
                 )
                 edicao_transferencia.save()
+                edicao_transferencia.refresh_from_db()
                 return JsonResponse(
-                    {"status": "success", "message": "Dados salvos com sucesso!"}
+                    {
+                        "status": "success",
+                        "message": "Dados salvos com sucesso!",
+                        "linha": _linha_erro_transferencia(edicao_transferencia),
+                    }
                 )
 
             else:
@@ -1366,8 +1379,13 @@ def receber_edicao(request):
                     ClasseRequisicao, pk=classe
                 )
                 edicao_requisicao.save()
+                edicao_requisicao.refresh_from_db()
                 return JsonResponse(
-                    {"status": "success", "message": "Dados salvos com sucesso!"}
+                    {
+                        "status": "success",
+                        "message": "Dados salvos com sucesso!",
+                        "linha": _linha_erro_requisicao(edicao_requisicao),
+                    }
                 )
 
     return JsonResponse(
