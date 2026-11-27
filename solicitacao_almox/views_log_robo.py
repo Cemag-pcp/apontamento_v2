@@ -12,10 +12,16 @@ As tabelas do sistema são referenciadas sem schema, então seguem o
 
 from datetime import date, datetime, timedelta
 
+import json
+
 from django.contrib.auth.decorators import login_required
-from django.db import connection
+from django.db import connection, transaction
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from core_almox.models import RegistroAcaoSolicitacaoAlmox
 
 from cadastro_almox.models import Cc, Funcionario, ItensSolicitacao
 from cadastro_almox.models import ClasseRequisicao
@@ -30,8 +36,25 @@ SITUACOES = {
     "lancada": "Lançada no ERP",
     "manual": "OK manual (sem chave)",
     "erro": "Erro",
+    "verificar": "Verificar no ERP",
     "pendente": "Pendente (sem retorno)",
 }
+
+
+# Motivo do erro, agrupado. Usa a mensagem da última tentativa do log e, se a
+# requisição não tem tentativa no log, o retorno gravado na própria requisição.
+_MSG_SQL = "COALESCE(NULLIF(ut.mensagem_erro, ''), sr.rpa, '')"
+_MOTIVO_SQL = f"""CASE
+                        WHEN {_MSG_SQL} ILIKE '%%saldo insuficiente%%' THEN 'Saldo insuficiente'
+                        WHEN {_MSG_SQL} ILIKE '%%regra cont%%' THEN 'Regra contábil não encontrada'
+                        WHEN {_MSG_SQL} ILIKE '%%timeout%%' THEN 'Timeout na tela do ERP'
+                        WHEN {_MSG_SQL} ILIKE '%%has been closed%%' THEN 'Navegador do robô fechado'
+                        WHEN {_MSG_SQL} ILIKE '%%não foi aprovada%%' THEN 'Requisição não aprovada no ERP'
+                        WHEN {_MSG_SQL} ILIKE 'VERIFICAR%%' THEN 'Verificar no ERP (sem resultado claro)'
+                        WHEN {_MSG_SQL} = '' THEN '(sem mensagem)'
+                        ELSE LEFT(REGEXP_REPLACE(REGEXP_REPLACE({_MSG_SQL},
+                                  '^ERRO:\\s*', ''), '\\s+', ' ', 'g'), 80)
+                    END"""
 
 
 def _t(model):
@@ -73,6 +96,16 @@ def _filtros(request):
         where.append("ut.resultado = %s")
         params.append(resultado)
 
+    motivo = request.GET.get("motivo") or ""
+    if motivo:
+        where.append("motivo = %s")
+        params.append(motivo)
+
+    item = (request.GET.get("item") or "").strip()
+    if item:
+        where.append("i.codigo = %s")
+        params.append(item)
+
     etapa = request.GET.get("etapa") or ""
     if etapa:
         where.append("ut.etapa_falha = %s")
@@ -106,8 +139,12 @@ def _base_sql():
                        WHEN sr.rpa = 'OK' AND COALESCE(sr.chave_innovaro, '') <> '' THEN 'lancada'
                        WHEN sr.rpa = 'OK' THEN 'manual'
                        WHEN sr.rpa IS NULL OR sr.rpa = '' THEN 'pendente'
+                       WHEN sr.rpa ILIKE 'VERIFICAR%%' THEN 'verificar'
                        ELSE 'erro'
                    END AS situacao,
+                   CASE WHEN sr.rpa IS NULL OR sr.rpa IN ('', 'OK') THEN NULL
+                        ELSE {_MOTIVO_SQL}
+                   END AS motivo,
                    ut.id AS ut_id, ut.resultado AS ut_resultado, ut.etapa_falha AS ut_etapa,
                    ut.mensagem_erro AS ut_mensagem, ut.iniciado_em AS ut_iniciado_em,
                    ut.chave_erp AS ut_chave_erp, ut.duracao_ms AS ut_duracao_ms,
@@ -136,11 +173,18 @@ def _base_sql():
     """
 
 
+# Colunas calculadas na CTE: o filtro delas vai para fora (WHERE sobre "base").
+_COLUNAS_CTE = ("situacao", "motivo")
+
+
+def _fora_da_cte(condicao):
+    return condicao.startswith(_COLUNAS_CTE)
+
+
 def _where_sql(where):
-    # "situacao" é calculada na CTE; o filtro dela vai para fora.
     dentro, fora = [], []
     for w in where:
-        (fora if w.startswith("situacao") else dentro).append(w)
+        (fora if _fora_da_cte(w) else dentro).append(w)
     return " AND ".join(dentro) or "TRUE", " AND ".join(fora) or "TRUE"
 
 
@@ -150,7 +194,7 @@ def _split_params(where, params):
     idx = 0
     for w in where:
         n = w.count("%s")
-        alvo = fora if w.startswith("situacao") else dentro
+        alvo = fora if _fora_da_cte(w) else dentro
         alvo.extend(params[idx:idx + n])
         idx += n
     return dentro, fora
@@ -206,18 +250,12 @@ def api_log_robo_resumo(request):
     )[0]
     top_erros = _executar(
         base + f"""
-        SELECT COALESCE(ut_etapa, '-') AS etapa,
-               CASE WHEN ut_mensagem ILIKE '%%saldo insuficiente%%' THEN 'Saldo insuficiente'
-                    WHEN ut_mensagem ILIKE '%%regra cont%%' THEN 'Regra contábil não encontrada'
-                    WHEN ut_mensagem ILIKE '%%timeout%%' THEN 'Timeout na tela do ERP'
-                    WHEN ut_mensagem ILIKE '%%has been closed%%' THEN 'Navegador do robô fechado'
-                    WHEN ut_mensagem ILIKE '%%não foi aprovada%%' THEN 'Requisição não aprovada no ERP'
-                    ELSE LEFT(REGEXP_REPLACE(COALESCE(ut_mensagem, ''), '\\s+', ' ', 'g'), 80)
-               END AS motivo,
+        SELECT motivo,
+               STRING_AGG(DISTINCT COALESCE(ut_etapa, 'sem log'), ', ') AS etapa,
                COUNT(*) AS qtd
         FROM base
-        WHERE {w_out} AND situacao = 'erro'
-        GROUP BY 1, 2 ORDER BY qtd DESC LIMIT 8
+        WHERE {w_out} AND motivo IS NOT NULL
+        GROUP BY 1 ORDER BY qtd DESC, motivo LIMIT 10
         """,
         p_in + p_out,
     )
@@ -225,7 +263,7 @@ def api_log_robo_resumo(request):
         base + f"""
         SELECT item_codigo, item_nome, COUNT(*) AS qtd
         FROM base
-        WHERE {w_out} AND situacao = 'erro'
+        WHERE {w_out} AND motivo IS NOT NULL
         GROUP BY 1, 2 ORDER BY qtd DESC LIMIT 8
         """,
         p_in + p_out,
@@ -310,6 +348,76 @@ def api_log_robo_solicitacoes(request):
 
 
 @login_required
+@require_POST
+def api_log_robo_retornar_fila(request, solicitacao_id):
+    """Devolve para a fila do robô uma requisição que ficou em VERIFICAR.
+
+    Volta ao estado de "pendente" (sem retorno e sem chave), que é o que o robô
+    busca. O retorno e a chave anteriores ficam guardados no registro de ações
+    do almoxarifado. Só funciona enquanto a requisição continua em VERIFICAR:
+    se o robô ou outra pessoa já resolveu, devolve 409.
+    """
+    try:
+        corpo = json.loads(request.body or "{}")
+    except ValueError:
+        corpo = {}
+    observacao = (corpo.get("observacao") or "").strip()
+
+    with transaction.atomic():
+        solicitacao = (
+            SolicitacaoRequisicao.objects.select_for_update()
+            .select_related("item", "funcionario", "cc", "classe_requisicao")
+            .filter(pk=solicitacao_id)
+            .first()
+        )
+        if solicitacao is None:
+            return JsonResponse({"status": "erro", "mensagem": "Requisição não encontrada."}, status=404)
+        if not (solicitacao.rpa or "").upper().startswith("VERIFICAR"):
+            return JsonResponse({
+                "status": "erro",
+                "mensagem": "Esta requisição não está mais em VERIFICAR (já foi resolvida). Atualize a página.",
+            }, status=409)
+
+        rpa_anterior = solicitacao.rpa
+        chave_anterior = solicitacao.chave_innovaro
+
+        usuario = request.user.get_full_name() or request.user.username
+        motivo = (
+            f"Retornada para a fila do robô pela tela Log do robô em "
+            f"{timezone.localtime().strftime('%d/%m/%Y %H:%M')} por {usuario}."
+        )
+        if observacao:
+            motivo += f" Obs: {observacao}"
+
+        RegistroAcaoSolicitacaoAlmox.objects.create(
+            tipo_solicitacao="requisicao",
+            acao="retorno_fila",
+            solicitacao_id_original=solicitacao.pk,
+            motivo=motivo,
+            payload={
+                "item": f"{solicitacao.item.codigo} - {solicitacao.item.nome}",
+                "quantidade": str(solicitacao.quantidade),
+                "funcionario": str(solicitacao.funcionario),
+                "cc": str(solicitacao.cc),
+                "classe_requisicao": str(solicitacao.classe_requisicao),
+                "rpa_anterior": rpa_anterior,
+                "chave_innovaro_anterior": chave_anterior,
+            },
+            usuario=request.user,
+        )
+
+        solicitacao.rpa = None
+        solicitacao.chave_innovaro = None
+        solicitacao.save(update_fields=["rpa", "chave_innovaro"])
+
+    return JsonResponse({
+        "status": "ok",
+        "mensagem": f"Requisição #{solicitacao_id} voltou para a fila do robô.",
+        "chave_anterior": chave_anterior or "",
+    })
+
+
+@login_required
 def api_log_robo_tentativas(request, solicitacao_id):
     tentativas = _executar(
         f"""
@@ -341,8 +449,14 @@ def api_log_robo_tentativas(request, solicitacao_id):
                 "detalhe": ev["detalhe"] or "",
             })
 
+    sol = SolicitacaoRequisicao.objects.filter(pk=solicitacao_id).values("rpa", "chave_innovaro").first() or {}
+    rpa_atual = sol.get("rpa") or ""
+
     return JsonResponse({
         "solicitacao_id": solicitacao_id,
+        "verificar": rpa_atual.upper().startswith("VERIFICAR"),
+        "rpa": rpa_atual,
+        "chave": sol.get("chave_innovaro") or "",
         "tentativas": [
             {
                 **{k: t[k] for k in ("id", "execucao_id", "item", "classe", "matricula", "cc",

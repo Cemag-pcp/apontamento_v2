@@ -16,6 +16,10 @@
     .log-robo tr.linha-sol { cursor: pointer; }
     .log-robo .lista-top li { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; padding: .2rem 0; border-bottom: 1px dashed #eee; }
     .log-robo .lista-top li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .log-robo .lista-top li.clicavel { cursor: pointer; border-radius: 4px; padding-left: .25rem; padding-right: .25rem; }
+    .log-robo .lista-top li.clicavel:hover { background: #f1f5ff; }
+    .log-robo .lista-top li.ativo { background: #e7f1ff; outline: 1px solid #0d6efd; }
+    .log-robo .filtro-chip { font-size: .8rem; }
     #modalTentativas pre { white-space: pre-wrap; word-break: break-word; font-size: .8rem; background: #f8f9fa; padding: .5rem; border-radius: 6px; margin: 0; }
     #modalTentativas .evento { font-size: .8rem; border-left: 3px solid #dee2e6; padding: .15rem .5rem; margin-bottom: .15rem; }
     #modalTentativas .evento.nivel-ERROR, #modalTentativas .evento.nivel-ERRO { border-color: #dc3545; }
@@ -24,6 +28,7 @@
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid log-robo py-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <div>
@@ -71,6 +76,8 @@
             <label class="form-label small mb-0" for="f-busca">Buscar</label>
             <input type="text" class="form-control form-control-sm" id="f-busca" name="busca" placeholder="ID, item, matrícula, chave, erro">
         </div>
+        <input type="hidden" id="f-motivo" name="motivo">
+        <input type="hidden" id="f-item" name="item">
         <div class="col-12 col-md-1 d-grid">
             <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Filtrar</button>
         </div>
@@ -78,32 +85,36 @@
 
     <!-- Indicadores -->
     <div class="row g-2 mb-3" id="kpis">
-        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao=""><div class="rotulo">Entregues</div><div class="valor" id="kpi-total">-</div></div></div>
-        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="lancada"><div class="rotulo">Lançadas no ERP</div><div class="valor text-success" id="kpi-lancada">-</div></div></div>
-        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="erro"><div class="rotulo">Com erro</div><div class="valor text-danger" id="kpi-erro">-</div></div></div>
-        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="pendente"><div class="rotulo">Pendentes</div><div class="valor text-warning" id="kpi-pendente">-</div></div></div>
-        <div class="col-6 col-md-2"><div class="kpi clicavel" data-situacao="manual"><div class="rotulo">OK manual (sem chave)</div><div class="valor text-secondary" id="kpi-manual">-</div></div></div>
-        <div class="col-6 col-md-2"><div class="kpi"><div class="rotulo">Tentativas (erros)</div><div class="valor" id="kpi-tentativas">-</div><div class="small text-muted" id="kpi-tentativas-sub"></div></div></div>
+        <div class="col-6 col-md"><div class="kpi clicavel" data-situacao=""><div class="rotulo">Entregues</div><div class="valor" id="kpi-total">-</div></div></div>
+        <div class="col-6 col-md"><div class="kpi clicavel" data-situacao="lancada"><div class="rotulo">Lançadas no ERP</div><div class="valor text-success" id="kpi-lancada">-</div></div></div>
+        <div class="col-6 col-md"><div class="kpi clicavel" data-situacao="erro"><div class="rotulo">Com erro</div><div class="valor text-danger" id="kpi-erro">-</div></div></div>
+        <div class="col-6 col-md"><div class="kpi clicavel" data-situacao="pendente"><div class="rotulo">Pendentes</div><div class="valor text-warning" id="kpi-pendente">-</div></div></div>
+        <div class="col-6 col-md"><div class="kpi clicavel" data-situacao="verificar"><div class="rotulo">Verificar no ERP</div><div class="valor text-info" id="kpi-verificar">-</div></div></div>
+        <div class="col-6 col-md"><div class="kpi clicavel" data-situacao="manual"><div class="rotulo">OK manual (sem chave)</div><div class="valor text-secondary" id="kpi-manual">-</div></div></div>
+        <div class="col-6 col-md"><div class="kpi"><div class="rotulo">Tentativas (erros)</div><div class="valor" id="kpi-tentativas">-</div><div class="small text-muted" id="kpi-tentativas-sub"></div></div></div>
     </div>
 
     <div class="row g-2 mb-3">
         <div class="col-md-6">
             <div class="kpi">
-                <div class="rotulo mb-1">Principais motivos de erro</div>
+                <div class="rotulo mb-1">Principais motivos de erro <small class="text-muted text-lowercase">(clique para filtrar)</small></div>
                 <ul class="list-unstyled mb-0 lista-top" id="top-erros"><li class="text-muted">-</li></ul>
             </div>
         </div>
         <div class="col-md-6">
             <div class="kpi">
-                <div class="rotulo mb-1">Itens com mais erros</div>
+                <div class="rotulo mb-1">Itens com mais erros <small class="text-muted text-lowercase">(clique para filtrar)</small></div>
                 <ul class="list-unstyled mb-0 lista-top" id="top-itens"><li class="text-muted">-</li></ul>
             </div>
         </div>
     </div>
 
     <!-- Tabela -->
-    <div class="d-flex justify-content-between align-items-center mb-1">
-        <small class="text-muted" id="info-total"></small>
+    <div class="d-flex justify-content-between align-items-center mb-1 gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <small class="text-muted" id="info-total"></small>
+            <span id="filtros-ativos" class="d-flex gap-1 flex-wrap"></span>
+        </div>
         <small class="text-muted">Clique na linha para ver todas as tentativas do robô</small>
     </div>
     <div class="tabela-wrap border rounded">
@@ -122,10 +133,11 @@
                     <th>Última tentativa</th>
                     <th>Etapa</th>
                     <th>Mensagem</th>
+                    <th>Ações</th>
                 </tr>
             </thead>
             <tbody id="tbody-log">
-                <tr><td colspan="12" class="text-center text-muted py-4">Carregando...</td></tr>
+                <tr><td colspan="13" class="text-center text-muted py-4">Carregando...</td></tr>
             </tbody>
         </table>
     </div>
@@ -133,6 +145,37 @@
         <button class="btn btn-outline-secondary btn-sm" id="btn-anterior" disabled>&laquo; Anterior</button>
         <span class="small" id="info-pagina"></span>
         <button class="btn btn-outline-secondary btn-sm" id="btn-proxima" disabled>Próxima &raquo;</button>
+    </div>
+</div>
+
+<!-- Modal: confirmar retorno para a fila do robô -->
+<div class="modal fade" id="modalRetornarFila" tabindex="-1" aria-labelledby="modalRetornarFilaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRetornarFilaLabel">Retornar para a fila do robô</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">A requisição <strong id="rf-id"></strong> está em <strong>VERIFICAR</strong>: o robô gravou no ERP, mas não teve confirmação do resultado.</p>
+                <div class="alert alert-warning small mb-2" id="rf-aviso-chave">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Antes de retornar, confira no ERP a chave <strong id="rf-chave"></strong>.
+                    Se ela foi gravada e atendida, <strong>não</strong> retorne para a fila: o robô vai lançar outra requisição e a saída fica duplicada.
+                </div>
+                <p class="small text-muted mb-2" id="rf-rpa"></p>
+                <label class="form-label small mb-1" for="rf-observacao">Observação (opcional)</label>
+                <textarea class="form-control form-control-sm" id="rf-observacao" rows="2" placeholder="Ex.: conferido no ERP, chave não existe"></textarea>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="rf-conferido">
+                    <label class="form-check-label small" for="rf-conferido">Conferi no ERP e a requisição não foi lançada</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-retorno" disabled>Retornar para a fila</button>
+            </div>
+        </div>
     </div>
 </div>
 
