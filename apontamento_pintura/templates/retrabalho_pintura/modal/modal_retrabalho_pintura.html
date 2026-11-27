@@ -39,25 +39,27 @@
     </div>
   </div>
 
-  <div class="modal fade" id="modal-finalizar-retrabalho-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="finalizar-retrabalho-pinturaLabel">
-    <div class="modal-dialog">
+  <!-- Finalizar retrabalho: registra o consumo (mesmo formulário do controle de pintura) -->
+  <div class="modal fade controle-pintura-modal" id="modal-consumo-retrabalho-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="modalConsumoRetrabalhoLabel">
+    <div class="modal-dialog modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Finalizar Retrabalho Pintura</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <div>
+            <h5 class="modal-title" id="modalConsumoRetrabalhoLabel">Finalizar retrabalho - consumo</h5>
+            <small class="text-muted" id="consumo-retrabalho-peca"></small>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
-        <form id="form-finalizar-retrabalho">
-            <div class="modal-body">
-                <input type="hidden" id="em-processo-id" name="em-processo-id">
-                <h6 class="label-modal" style="font-size: 19px;"><code id="desc-peca-em-processo"></code></h6>
-            </div>
-            <div class="modal-footer">
-                <button id="submit-finalizar-retrabalho" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
-                    <span class="spinner-border spinner-border-sm" style="display: none;"></span>
-                    <span role="status">Finalizar</span>
-                </button>
-            </div>
-        </form>
+        <div class="modal-body">
+          {% include 'apontamento_pintura/partials/form_controle_pintura.html' %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-dark d-flex align-items-center gap-2" id="btn-salvar-consumo-retrabalho">
+            <span class="spinner-border spinner-border-sm" style="display: none;"></span>
+            <span role="status">Finalizar retrabalho</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

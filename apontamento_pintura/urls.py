@@ -37,6 +37,7 @@ urlpatterns = [
 
     path('api/confirmar-retrabalho-pintura/', views.confirmar_retrabalho_pintura, name='confirmar_retrabalho_pintura'),
     path('api/finalizar-retrabalho-pintura/', views.finalizar_retrabalho_pintura, name='finalizar_retrabalho_pintura'),
+    path('api/finalizar-retrabalho-pintura-consumo/', views.finalizar_retrabalho_com_consumo_pintura, name='finalizar_retrabalho_com_consumo_pintura'),
 ]
 
 # templates
