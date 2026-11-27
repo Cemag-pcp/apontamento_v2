@@ -1,0 +1,100 @@
+/* Formulário do controle de pintura: usado em /pintura/controle/ e no
+ * consumo ao finalizar retrabalho (/pintura/retrabalho). */
+
+.controle-pintura-modal .modal-dialog {
+    max-width: 520px;
+}
+
+.controle-pintura-modal .modal-content {
+    font-size: .84rem;
+}
+
+.controle-pintura-modal .modal-header,
+.controle-pintura-modal .modal-footer {
+    padding: .65rem .85rem;
+}
+
+.controle-pintura-modal .modal-body {
+    padding: .85rem;
+}
+
+.controle-pintura-modal .modal-title {
+    font-size: 1rem;
+}
+
+.controle-pintura-modal .form-control,
+.controle-pintura-modal .form-select,
+.controle-pintura-modal .input-group-text {
+    min-height: 32px;
+    padding: .25rem .5rem;
+    font-size: .84rem;
+}
+
+.controle-pintura-form-vertical {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .65rem .85rem;
+}
+
+.controle-pintura-form-vertical .form-label {
+    margin-bottom: .25rem;
+    font-weight: 600;
+}
+
+.controle-pintura-form-section {
+    grid-column: 1 / -1;
+}
+
+.controle-pintura-form-subtitle {
+    margin: 0 0 .55rem;
+    font-size: .82rem;
+    font-weight: 700;
+    color: #495057;
+    text-transform: uppercase;
+}
+
+.controle-pintura-general-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .65rem .85rem;
+}
+
+.controle-pintura-operation-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .65rem .85rem;
+}
+
+.controle-pintura-pressure-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .65rem .85rem;
+}
+
+.controle-pintura-product-label {
+    display: block;
+    text-align: center;
+}
+
+.controle-pintura-product-units {
+    max-width: 260px;
+    margin: 0 auto;
+}
+
+.controle-pintura-compact-field {
+    max-width: 180px;
+    margin: 0 auto;
+}
+
+@media (max-width: 575.98px) {
+    .controle-pintura-modal .modal-dialog {
+        max-width: none;
+    }
+
+    .controle-pintura-form-vertical,
+    .controle-pintura-general-row,
+    .controle-pintura-operation-row,
+    .controle-pintura-pressure-row {
+        grid-template-columns: 1fr;
+    }
+}

@@ -20,7 +20,7 @@ from uuid import uuid4
 from core.models import Profile
 from apontamento_pintura.models import Retrabalho
 from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
-from .models import PecasOrdem, CambaoPecas, Cambao, CambaoInterrupcao, TesteFuncional, Programa, Programacao, ControlePintura
+from .models import PecasOrdem, CambaoPecas, Cambao, CambaoInterrupcao, TesteFuncional, Programa, Programacao, ControlePintura, ConsumoRetrabalhoPintura
 from core.models import Ordem
 from cadastro.models import Operador, Conjuntos
 from inspecao.models import Inspecao
@@ -86,6 +86,14 @@ def _dados_controle_pintura_request(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return None, JsonResponse({"error": "JSON inválido"}, status=400)
+
+    return _dados_controle_pintura(data)
+
+def _dados_controle_pintura(data):
+    """Valida/normaliza os campos do formulário de controle de pintura (também
+    usado no consumo do retrabalho). Retorna (dados, erro_jsonresponse)."""
+    if not isinstance(data, dict):
+        return None, JsonResponse({"error": "Dados do formulário inválidos."}, status=400)
 
     data_registro = None
     data_informada = (data.get("data") or "").strip()
@@ -2157,6 +2165,71 @@ def confirmar_retrabalho_pintura(request):
         return JsonResponse(
             {"error": f"Erro interno do servidor: {str(e)}"}, status=500
         )
+
+def finalizar_retrabalho_com_consumo_pintura(request):
+    """Finaliza o retrabalho gravando o consumo (mesmo formulário do controle de
+    pintura), ligado ao retrabalho e à peça retrabalhada.
+
+    Body JSON: {"id": <id da inspeção>, "consumo": {campos do controle}}.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    inspecao_id = body.get("id")
+    if not inspecao_id:
+        return JsonResponse({"error": "ID não fornecido"}, status=400)
+
+    dados, erro = _dados_controle_pintura(body.get("consumo"))
+    if erro:
+        return erro
+
+    # O objetivo é controlar o consumo: a quantidade de tinta é obrigatória
+    if not dados["quantidade_tinta"] or Decimal(dados["quantidade_tinta"]) <= 0:
+        return JsonResponse({"error": "Informe a quantidade de tinta consumida."}, status=400)
+
+    with transaction.atomic():
+        retrabalho = (
+            Retrabalho.objects.select_for_update(of=("self",))
+            .select_related("reinspecao__inspecao__pecas_ordem_pintura")
+            .filter(reinspecao__inspecao_id=inspecao_id)
+            .first()
+        )
+        if not retrabalho:
+            return JsonResponse(
+                {"error": "Nenhum retrabalho encontrado para esta reinspeção"}, status=404
+            )
+        if retrabalho.status != "em processo":
+            return JsonResponse(
+                {"error": f"Este retrabalho não está em processo (status: {retrabalho.status}). Atualize a página."},
+                status=409,
+            )
+
+        peca_ordem = retrabalho.reinspecao.inspecao.pecas_ordem_pintura
+        if peca_ordem is None:
+            return JsonResponse({"error": "Peça do retrabalho não encontrada."}, status=400)
+
+        consumo = ConsumoRetrabalhoPintura.objects.create(
+            retrabalho=retrabalho,
+            peca_ordem=peca_ordem,
+            usuario=request.user if request.user.is_authenticated else None,
+            **dados,
+        )
+
+        brasil_tz = timezone("America/Sao_Paulo")
+        retrabalho.data_fim = now().astimezone(brasil_tz)
+        retrabalho.status = "finalizado"
+        retrabalho.save(update_fields=["data_fim", "status"])
+
+    return JsonResponse({
+        "success": "Retrabalho finalizado com sucesso",
+        "retrabalho_id": retrabalho.id,
+        "consumo_id": consumo.id,
+    })
 
 def finalizar_retrabalho_pintura(request):
 

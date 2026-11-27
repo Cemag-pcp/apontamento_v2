@@ -107,6 +107,48 @@ class ControlePintura(models.Model):
     def __str__(self):
         return f"{self.data or 'Sem data'} - {self.fornecedor} - {self.cor}"
 
+class ConsumoRetrabalhoPintura(models.Model):
+    """Consumo de tinta/insumos informado ao finalizar um retrabalho da pintura.
+
+    Mesmos campos do ControlePintura, ligado ao retrabalho e à peça
+    retrabalhada (PecasOrdem da pintura). Um registro por retrabalho.
+    """
+    retrabalho = models.OneToOneField(
+        Retrabalho, on_delete=models.CASCADE, related_name="consumo"
+    )
+    peca_ordem = models.ForeignKey(
+        PecasOrdem, on_delete=models.CASCADE, related_name="consumos_retrabalho"
+    )
+    usuario = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="consumos_retrabalho_pintura",
+    )
+
+    data = models.DateField(null=True, blank=True)
+    fornecedor = models.CharField(max_length=120, blank=True)
+    cor = models.CharField(max_length=80, blank=True)
+    lote = models.CharField(max_length=80, blank=True)
+    quantidade_tinta = models.CharField(max_length=80, blank=True)
+    catalizador = models.CharField(max_length=80, blank=True)
+    diluente = models.CharField(max_length=80, blank=True)
+    viscosidade = models.CharField(max_length=40, blank=True)
+    pintor = models.CharField(max_length=120, blank=True)
+    pistola = models.CharField(max_length=80, blank=True)
+    qnt_demaos = models.CharField(max_length=40, blank=True)
+    pressao_ar_1 = models.CharField(max_length=40, blank=True)
+    pressao_ar_2 = models.CharField(max_length=40, blank=True)
+    pressao_ar_3 = models.CharField(max_length=40, blank=True)
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Consumo de Retrabalho (Pintura)"
+        verbose_name_plural = "Consumos de Retrabalho (Pintura)"
+        ordering = ["-data_criacao"]
+
+    def __str__(self):
+        return f"Retrabalho #{self.retrabalho_id} - {self.peca_ordem.peca} - {self.quantidade_tinta} L"
+
 class TesteFuncional(models.Model):
     STATUS_CHOICES = (
         ("pendente","Pendente"),

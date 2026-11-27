@@ -137,6 +137,8 @@ function buscarItensEmProcesso(pagina) {
                             type="checkbox"
                             class="form-check-input selecionar-finalizar-lote"
                             data-id="${item.id}"
+                            data-peca="${item.peca}"
+                            data-cor="${item.cor}"
                             aria-label="Selecionar retrabalho para finalizar"
                         >
                     </div>
@@ -238,49 +240,16 @@ document.addEventListener("change", function(event) {
 
 const botaoFinalizarLote = document.getElementById("btn-finalizar-retrabalho-lote");
 if (botaoFinalizarLote) {
-    botaoFinalizarLote.addEventListener("click", async () => {
+    // Finalizar em lote: o consumo é registrado peça a peça (um modal por item)
+    botaoFinalizarLote.addEventListener("click", () => {
         const selecionados = Array.from(document.querySelectorAll(".selecionar-finalizar-lote:checked"));
         if (!selecionados.length) {
             return;
         }
-        if (!window.confirm(`Deseja finalizar o retrabalho de ${selecionados.length} item(ns)?`)) {
-            return;
-        }
-
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const textoOriginal = botaoFinalizarLote.textContent;
-        botaoFinalizarLote.disabled = true;
-        botaoFinalizarLote.textContent = "Finalizando...";
-
-        const requisicoes = selecionados.map((checkbox) => {
-            const formData = new FormData();
-            formData.append("id", checkbox.dataset.id);
-            return fetch(`/pintura/api/finalizar-retrabalho-pintura/`, {
-                method: "POST",
-                headers: {
-                    "X-CSRFToken": csrfToken,
-                },
-                body: formData,
-            }).then((response) => {
-                if (!response.ok) {
-                    throw new Error(`Erro HTTP: ${response.status}`);
-                }
-                return response.json();
-            });
-        });
-
-        const resultados = await Promise.allSettled(requisicoes);
-        const quantidadeSucesso = resultados.filter((resultado) => resultado.status === "fulfilled").length;
-        const quantidadeErro = resultados.length - quantidadeSucesso;
-
-        if (quantidadeErro > 0) {
-            console.error(`Falha ao finalizar ${quantidadeErro} item(ns) de retrabalho.`);
-        }
-
-        buscarItensEmProcesso(1);
-        buscarItensInspecionadosRetrabalho(1);
-
-        botaoFinalizarLote.disabled = false;
-        botaoFinalizarLote.textContent = textoOriginal;
+        abrirConsumoRetrabalho(selecionados.map((checkbox) => ({
+            id: checkbox.dataset.id,
+            peca: checkbox.dataset.peca,
+            cor: checkbox.dataset.cor,
+        })));
     });
 }

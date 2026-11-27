@@ -16,14 +16,14 @@ document.addEventListener("click", function(event) {
 document.addEventListener("click", function(event) {
     if (event.target.closest(".finalizar-em-processo")) { 
 
-        const id = event.target.getAttribute("data-id");
-        const peca = event.target.getAttribute("data-peca");
+        const botao = event.target.closest(".finalizar-em-processo");
 
-        document.getElementById("em-processo-id").value = id;
-        document.getElementById("desc-peca-em-processo").textContent = `Deseja finalizar o retrabalho do conjunto ${peca}?`;
-
-        const modal = new bootstrap.Modal(document.getElementById("modal-finalizar-retrabalho-pintura"));
-        modal.show();
+        // Finalizar = registrar o consumo do retrabalho (finalizar-retrabalho.js)
+        abrirConsumoRetrabalho([{
+            id: botao.getAttribute("data-id"),
+            peca: botao.getAttribute("data-peca"),
+            cor: botao.getAttribute("data-cor"),
+        }]);
 
     }
 })
