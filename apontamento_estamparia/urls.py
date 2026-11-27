@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/erp/apontamentos/', views.api_erp_apontamentos_estamparia, name='api_erp_apontamentos_estamparia'),
     path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_estamparia, name='api_erp_apontar_item_estamparia'),
     path('api/erp/apontamentos/<int:pk>/resolver-erp/', views.api_erp_resolver_aguardando_estamparia, name='api_erp_resolver_aguardando_estamparia'),
+    path('api/inspecao-operador/<int:inspecao_id>/', views.api_inspecao_operador, name='api_inspecao_operador'),
     path('api/retornar-processo/', views.retornar_processo, name='retornar_processo')
 ]
 

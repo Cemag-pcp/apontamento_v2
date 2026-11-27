@@ -286,6 +286,42 @@ def extrair_numeracao(nome_arquivo):
         return match.group(1)
     return None
 
+
+def _dados_inspecao_operador(inspecao):
+    """Dados para abrir o modal de inspeção no apontamento (inspeção do operador)."""
+    peca_ordem = inspecao.pecas_ordem_estamparia
+    peca = peca_ordem.peca if peca_ordem else None
+    ordem = peca_ordem.ordem if peca_ordem else None
+    return {
+        'id': inspecao.id,
+        'ordem_id': ordem.id if ordem else None,
+        'ordem_numero': ordem.ordem if ordem else None,  # número que o operador vê nos cards
+        'peca': f"{peca.codigo} - {peca.descricao}" if peca else '',
+        'maquina': ordem.maquina.nome if ordem and ordem.maquina else '',
+        'qtd': peca_ordem.qtd_boa if peca_ordem else 0,
+    }
+
+
+@login_required
+@require_GET
+def api_inspecao_operador(request, inspecao_id):
+    """Situação de uma inspeção aberta pelo operador ao finalizar a ordem.
+
+    A tela de apontamento guarda a inspeção pendente no navegador e, ao
+    recarregar, consulta aqui se ela ainda precisa ser feita (inspeção
+    obrigatória). ``pendente`` é falso quando já foi inspecionada.
+    """
+    inspecao = (
+        Inspecao.objects
+        .select_related('pecas_ordem_estamparia__peca', 'pecas_ordem_estamparia__ordem__maquina')
+        .filter(pk=inspecao_id, pecas_ordem_estamparia__isnull=False)
+        .first()
+    )
+    if inspecao is None:
+        return JsonResponse({'pendente': False, 'motivo': 'nao_encontrada'})
+    pendente = not DadosExecucaoInspecao.objects.filter(inspecao=inspecao).exists()
+    return JsonResponse({'pendente': pendente, **_dados_inspecao_operador(inspecao)})
+
 @login_required
 def planejamento(request):
 
@@ -301,7 +337,11 @@ def planejamento(request):
                                                                     'motivos_maquina_parada':motivos_maquina_parada,
                                                                     'motivos_exclusao': motivos_exclusao,
                                                                     'setor_estamparia_id': setor_estamparia.id if setor_estamparia else '',
-                                                                    'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
+                                                                    'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR),
+                                                                    # Inspeção obrigatória ao finalizar: o inspetor é o usuário logado
+                                                                    # (no chão de fábrica, o usuário "estamparia")
+                                                                    'inspetor_logado': {'nome_usuario': request.user.username, 'id': request.user.id},
+                                                                    'modo_operador': True})
 
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
@@ -628,6 +668,7 @@ def atualizar_status_ordem(request):
         with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
             ordem = Ordem.objects.select_for_update().get(pk=ordem_id)
             item_id_para_apontamento_erp = None
+            inspecao_lote_final = None  # inspeção que o operador faz logo após finalizar
 
             # Validações com lock para evitar corrida/duplicidade de finalização
             if ordem.status_atual == status:
@@ -703,8 +744,9 @@ def atualizar_status_ordem(request):
                 if inspecao_existente and not DadosExecucaoInspecao.objects.filter(inspecao=inspecao_existente).exists():
                     inspecao_existente.pecas_ordem_estamparia = nova_peca_ordem
                     inspecao_existente.save(update_fields=['pecas_ordem_estamparia'])
+                    inspecao_lote_final = inspecao_existente
                 elif not inspecao_existente:
-                    Inspecao.objects.create(pecas_ordem_estamparia=nova_peca_ordem)
+                    inspecao_lote_final = Inspecao.objects.create(pecas_ordem_estamparia=nova_peca_ordem)
 
                 item_id_para_apontamento_erp = nova_peca_ordem.id
 
@@ -793,6 +835,8 @@ def atualizar_status_ordem(request):
                 'ordem_id': ordem.id,
                 'status': novo_processo.status,
                 'data_inicio': novo_processo.data_inicio,
+                # Ao finalizar, a tela abre a inspeção do lote final para o operador
+                'inspecao': _dados_inspecao_operador(inspecao_lote_final) if inspecao_lote_final else None,
             })
 
     except Ordem.DoesNotExist:
