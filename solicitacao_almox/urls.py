@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/log-robo/resumo/', views_log_robo.api_log_robo_resumo, name='api_log_robo_resumo'),
     path('api/log-robo/solicitacoes/', views_log_robo.api_log_robo_solicitacoes, name='api_log_robo_solicitacoes'),
     path('api/log-robo/solicitacao/<int:solicitacao_id>/tentativas/', views_log_robo.api_log_robo_tentativas, name='api_log_robo_tentativas'),
+    path('api/log-robo/solicitacao/<int:solicitacao_id>/retornar-fila/', views_log_robo.api_log_robo_retornar_fila, name='api_log_robo_retornar_fila'),
 
     path('api/get-dados/', views.get_data_solicitacao, name='get_data_solicitacao'),
     path('api/get-recursos/', views.get_recursos, name='get_recursos'),
