@@ -112,8 +112,8 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-danger btn-sm btn-interromper me-2" title="Interromper">
                                     <i class="fa fa-stop"></i>
                                 </button>
-                                <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
-                                    <i class="fa fa-check"></i>
+                                <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar e ir para a inspeção">
+                                    <i class="bi bi-clipboard-check"></i> Ir para inspeção
                                 </button>
                                 <button class="btn btn-primary btn-sm btn-duplicar" title="Duplicar Ordem">
                                     <i class="fa fa-clone"></i>
@@ -163,7 +163,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     <span>${statusBadge}</span>
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Criado em: ${ordem.data_criacao}</p>
-                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
+                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao || '-'}</p>
                                 ${ordem.status_atual === 'finalizada' 
                                     ? `<p class="text-success fw-semibold mb-2" style="font-size: 0.85rem;">Finalizada em: ${ordem.ultima_atualizacao}</p>` 
                                     : ''
@@ -417,8 +417,8 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                             <button class="btn btn-warning btn-sm btn-interromper m-2" title="Interromper">
                                 <i class="fa fa-stop"></i>
                             </button>
-                            <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar">
-                                <i class="fa fa-check"></i>
+                            <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar e ir para a inspeção">
+                                <i class="bi bi-clipboard-check"></i> Ir para inspeção
                             </button>
                         </div>
                     `;
@@ -1746,21 +1746,22 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             // Renderiza propriedades
             const propriedadesHTML = `
                 <h6 class="text-center mt-3">Informações da matéria-prima</h6>
-                <table class="table table-bordered table-sm text-center">
+                <!-- table-layout fixed: descrição longa da MP não estoura a largura do modal -->
+                <table class="table table-bordered table-sm text-center" style="table-layout: fixed; width: 100%;">
                     <thead>
                         <tr class="table-light">
                             <th>Descrição</th>
-                            <th>Tamanho</th>
-                            <th>Quantidade</th>
+                            <th style="width: 120px;">Tamanho</th>
+                            <th style="width: 120px;">Quantidade</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="text-align: center; padding: 5px;">
+                            <td style="text-align: left; padding: 5px; min-width: 0;">
                                 <select 
                                     id="selectMpSerraAlterar"
                                     class="form-select form-select-sm select2-materia-prima"
-                                    style="width: 100%; max-width: 150px; font-size: 0.85rem; padding: 0.2rem 0.5rem; height: auto;"
+                                    style="width: 100%; font-size: 0.85rem; padding: 0.2rem 0.5rem; height: auto;"
                                     required>
                                     <option value="${data.propriedades.id_mp}" selected>${data.propriedades.descricao_mp || 'Selecione'}</option>
                                 </select>
@@ -1774,7 +1775,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                                     id="tamanhoVaraInput" 
                                     name="tamanhoVaraInput"
                                     value=${tamanho}
-                                    style="width: 100px; text-align: center;" required>
+                                    style="width: 100%; text-align: center;" required>
                             </td>
                             <td>
                                 <input 
@@ -1786,7 +1787,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                                     name="propQtd"
                                     data-qtd-vara="${data.propriedades.quantidade}" 
                                     value="${data.propriedades.quantidade}" 
-                                    style="width: 100px; text-align: center;" required>
+                                    style="width: 100%; text-align: center;" required>
                             </td>
                         </tr>
                     </tbody>
@@ -1796,6 +1797,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 
             $('#selectMpSerraAlterar').select2({
                 theme: 'bootstrap-5', // Tema específico para Bootstrap 5
+                width: '100%', // ocupa a célula; texto longo é cortado com reticências
                 ajax: {
                     url: 'api/get-mp/',
                     dataType: 'json',
@@ -2003,13 +2005,29 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 });
             };
 
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso',
-                text: mensagemParcial,
-            }).then(() => {
-                mostrarPromptIniciarRestante();
-            });
+            // Inspeção obrigatória: abre o modal de inspeção assim que o de
+            // finalizar fechar; o "iniciar restante" vem depois da inspeção.
+            const inspecoes = Array.isArray(data.inspecoes) ? data.inspecoes : [];
+            if (inspecoes.length && typeof window.iniciarInspecaoOperadorSerraUsinagem === 'function') {
+                Swal.close();
+                const modalFinalizarEl = document.getElementById('modalFinalizar');
+                const abrirInspecao = () => window.iniciarInspecaoOperadorSerraUsinagem(inspecoes, {
+                    aoConcluir: mostrarPromptIniciarRestante,
+                });
+                if (modalFinalizarEl && modalFinalizarEl.classList.contains('show')) {
+                    modalFinalizarEl.addEventListener('hidden.bs.modal', abrirInspecao, { once: true });
+                } else {
+                    abrirInspecao();
+                }
+            } else {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: mensagemParcial,
+                }).then(() => {
+                    mostrarPromptIniciarRestante();
+                });
+            }
             
             const containerIniciado = document.querySelector('.containerProcesso');
             carregarOrdensIniciadas(containerIniciado);

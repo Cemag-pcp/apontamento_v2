@@ -136,12 +136,24 @@ function enviarDadosInspecao(parcial = false) {
                 });
             }
 
-            buscarItensInspecao(1);
-            buscarItensReinspecao(1);
-            buscarItensInspecionados(1);
+            // Listas da tela de inspeção (não existem no apontamento)
+            if (typeof buscarItensInspecao === 'function') buscarItensInspecao(1);
+            if (typeof buscarItensReinspecao === 'function') buscarItensReinspecao(1);
+            if (typeof buscarItensInspecionados === 'function') buscarItensInspecionados(1);
 
+            const idInspecaoEnviada = document.getElementById('id-inspecao').value;
             const modal = bootstrap.Modal.getInstance(document.getElementById('inspectionModal'));
-            modal.hide();
+            if (modal) modal.hide();
+
+            // Avisa quem abriu o modal (ex.: apontamento da serra/usinagem)
+            document.dispatchEvent(new CustomEvent('inspecao-serra-usinagem:enviada', {
+                detail: {
+                    id: idInspecaoEnviada,
+                    finalizada: !!data.inspecao_finalizada,
+                    amostras_feitas: data.amostras_feitas,
+                    amostras_exigidas: data.amostras_exigidas,
+                }
+            }));
         })
         .catch(error => {
             Toast.fire({
