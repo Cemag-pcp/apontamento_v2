@@ -8,6 +8,8 @@
 {% block links %}
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
     <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+    <!-- Modal de inspeção (mesmo estilo da tela de inspeção, restrito ao #inspectionModal) -->
+    <link rel="stylesheet" href="{% static 'css/inspecao-operador-estamparia.css' %}">
     <style>
         :root {
             --dash-bg: #f1f5f9;
@@ -541,7 +543,7 @@
                     <!-- Footer do Formulário -->
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Finalizar</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-clipboard-check"></i> Finalizar e ir para inspeção</button>
                     </div>
                 </form>
             </div>
@@ -699,9 +701,16 @@
      data-setor-usinagem-id="{{ setor_usinagem_id }}">
 </div>
 
+{% include 'modal_inspecao/modal_inspecionar_serra_usinagem.html' %}
+
 {% endblock %}
 
 {% block scripts %}
+<!-- Inspeção obrigatória ao finalizar (scripts clássicos, antes dos módulos) -->
+<script src="{% static 'js/serra-usinagem/medidas/medidas.js' %}"></script>
+<script src="{% static 'js/serra-usinagem/inspecionar/form-inspecao-serra-usinagem.js' %}"></script>
+<script src="{% static 'js/serra-usinagem/inspecionar/enviar-inspecao.js' %}"></script>
+<script src="{% static 'js/serra-usinagem/inspecionar/inspecao-operador-serra-usinagem.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="{% static 'js/planejar-usinagem.js' %}"></script>
 <script type="module" src="{% static 'js/ordem-criada-usinagem.js' %}"></script>

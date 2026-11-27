@@ -21,6 +21,7 @@ from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso, MaquinaParada, Profile
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao, Setor
 from inspecao.models import Inspecao
+from inspecao.views.serra_usinagem import contexto_inspecao_operador, inspecoes_pendentes_operador
 from .utils import criar_ordem_usinagem
 
 import pandas as pd
@@ -251,7 +252,9 @@ def planejamento(request):
                                                                       'motivos_exclusao': motivos_exclusao,
                                                                       'processos': processos,
                                                                       'setor_usinagem_id': setor_usinagem.id if setor_usinagem else '',
-                                                                      'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
+                                                                      'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR),
+                                                                      # Inspeção obrigatória ao finalizar (modal de inspeção no apontamento)
+                                                                      **contexto_inspecao_operador(request, 'usinagem')})
 
 def processos(request):
 
@@ -543,7 +546,8 @@ def atualizar_status_ordem(request):
 
                 # Atualiza o status da ordem para o novo status
                 ordem.status_atual = status
-                
+                inspecao_lote_final = None
+
                 if status == 'iniciada':
 
                     # Pode ser que a ordem tenha sido reestarada, então não precisao atualizar a máquina
@@ -590,8 +594,9 @@ def atualizar_status_ordem(request):
                     if inspecao_inicial:
                         inspecao_inicial.pecas_ordem_usinagem = peca_obj
                         inspecao_inicial.save(update_fields=['pecas_ordem_usinagem'])
+                        inspecao_lote_final = inspecao_inicial
                     else:
-                        Inspecao.objects.create(pecas_ordem_usinagem=peca_obj)
+                        inspecao_lote_final = Inspecao.objects.create(pecas_ordem_usinagem=peca_obj)
 
                     # Envio silencioso ao ERP após confirmar a transação de finalização.
                     transaction.on_commit(
@@ -638,12 +643,17 @@ def atualizar_status_ordem(request):
                 ordem.save()
                 notificar_ordem(ordem)  # dispara o websocket
 
-                return JsonResponse({
+                resposta = {
                     'message': 'Status atualizado com sucesso.',
                     'ordem_id': ordem.id,
                     'status': novo_processo.status,
                     'data_inicio': novo_processo.data_inicio,
-                })
+                }
+                if status == 'finalizada':
+                    # Inspeção que o operador faz logo após finalizar (obrigatória)
+                    resposta['inspecoes'] = inspecoes_pendentes_operador([inspecao_lote_final])
+
+                return JsonResponse(resposta)
 
         except Ordem.DoesNotExist:
             return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
