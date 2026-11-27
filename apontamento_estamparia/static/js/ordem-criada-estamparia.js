@@ -286,8 +286,8 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-danger btn-sm btn-interromper" title="Interromper">
                                     <i class="fa fa-stop"></i>
                                 </button>
-                                <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
-                                    <i class="fa fa-check"></i>
+                                <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar e ir para a inspeção">
+                                    <i class="bi bi-clipboard-check"></i> Ir para inspeção
                                 </button>
                                 <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
                                     <i class="fa fa-arrow-right"></i>
@@ -546,8 +546,8 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                     <button class="btn btn-warning btn-sm btn-interromper m-2" title="Interromper">
                         <i class="fa fa-stop"></i>
                     </button>
-                    <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar">
-                        <i class="fa fa-check"></i>
+                    <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar e ir para a inspeção">
+                        <i class="bi bi-clipboard-check"></i> Ir para inspeção
                     </button>
                     <button class="btn btn-primary btn-sm btn-proximo-processo m-2" title="Passar para o próximo processo">
                         <i class="fa fa-arrow-right"></i>
@@ -1736,12 +1736,21 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                     }
                     return data;
                 })
-                .then(() => {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso',
-                        text: 'Ordem finalizada com sucesso.',
-                    });
+                .then((data) => {
+                    // Inspeção obrigatória: com inspeção pendente do lote final, o
+                    // modal de inspeção abre logo depois (inspecao-operador-estamparia.js).
+                    const inspecao = data && data.inspecao;
+                    const abrirInspecao = inspecao && typeof window.iniciarInspecaoOperadorEstamparia === 'function';
+
+                    if (abrirInspecao) {
+                        Swal.close();
+                    } else {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso',
+                            text: 'Ordem finalizada com sucesso.',
+                        });
+                    }
 
                     // Atualiza a interface
                     const containerIniciado = document.querySelector('.containerProcesso');
@@ -1751,6 +1760,12 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                     document.getElementById('ordens-container').innerHTML = '';
                     resetarCardsInicial();
 
+                    if (abrirInspecao) {
+                        // Abre a inspeção só depois que o modal de finalizar terminar de fechar
+                        document.getElementById('modalFinalizar').addEventListener('hidden.bs.modal', () => {
+                            window.iniciarInspecaoOperadorEstamparia(inspecao);
+                        }, { once: true });
+                    }
                     modal.hide();
 
                     fetchContagemStatusOrdens();

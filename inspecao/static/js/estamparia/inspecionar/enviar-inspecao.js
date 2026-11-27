@@ -196,11 +196,19 @@ function enviarDadosInspecao() {
             title: `Inspecao gravada com sucesso.`
         });
 
-        buscarItensInspecao(1);
-        buscarItensReinspecao(1);
-        buscarItensInspecionados(1);
+        // Listas da tela de inspeção (não existem no apontamento da estamparia)
+        if (typeof buscarItensInspecao === "function") buscarItensInspecao(1);
+        if (typeof buscarItensReinspecao === "function") buscarItensReinspecao(1);
+        if (typeof buscarItensInspecionados === "function") buscarItensInspecionados(1);
+
+        const idInspecaoEnviada = document.getElementById('id-inspecao').value;
         const modalInspectionModal = bootstrap.Modal.getInstance(document.getElementById('inspectionModal'));
-        modalInspectionModal.hide();
+        if (modalInspectionModal) modalInspectionModal.hide();
+
+        // Avisa quem abriu o modal (ex.: apontamento da estamparia)
+        document.dispatchEvent(new CustomEvent('inspecao-estamparia:enviada', {
+            detail: { id: idInspecaoEnviada }
+        }));
     })
     .catch(error => {
         Toast.fire({
@@ -208,7 +216,18 @@ function enviarDadosInspecao() {
             title: error.message
         });
         console.error('Erro:', error);
-        location.reload();
+        // No apontamento (inspeção obrigatória) o modal continua aberto para
+        // tentar de novo; na tela de inspeção mantém o comportamento antigo.
+        const modalEl = document.getElementById('inspectionModal');
+        if (modalEl?.dataset.modo !== 'operador') {
+            location.reload();
+        } else if ((error.message || '').toLowerCase().includes('já inspecionado')) {
+            // Alguém já inspecionou este lote: não há mais o que fazer aqui
+            bootstrap.Modal.getInstance(modalEl)?.hide();
+            document.dispatchEvent(new CustomEvent('inspecao-estamparia:enviada', {
+                detail: { id: document.getElementById('id-inspecao').value, jaInspecionado: true }
+            }));
+        }
     }).finally(() => {
         buttonSalvarInspecao.disabled = false; // Reabilitar o botao
         buttonSalvarInspecao.innerHTML = 'Salvar';
