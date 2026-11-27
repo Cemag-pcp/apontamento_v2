@@ -1,0 +1,135 @@
+<!-- Modal para inspecionar -->
+{% comment %}
+    Usado na tela de inspeção e no apontamento da serra/usinagem.
+    modo_operador: inspeção obrigatória ao finalizar a ordem (sem fechar,
+    inspetor = usuário logado, sem "Salvar parcialmente").
+{% endcomment %}
+<div class="modal fade" id="inspectionModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="inspectionModalLabel"{% if modo_operador %} data-bs-keyboard="false" data-modo="operador" data-setor="{{ setor_operador }}"{% endif %}>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <input type="hidden" value="" id="id-inspecao">
+            <div class="modal-header">
+                <h5 class="modal-title" id="inspectionModalLabel">Inspeção serra-usinagem</h5>
+                {% if modo_operador %}
+                    <span class="badge bg-warning text-dark ms-auto">Obrigatória para finalizar a ordem</span>
+                {% else %}
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                {% endif %}
+            </div>
+            <div class="modal-body">
+                <form id="inspectionForm">
+                    <!-- Seção 1: Informações Básicas -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Informações Básicas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="dataInspecao" class="form-label">Data da inspeção</label>
+                                    <input type="date" class="form-control" id="dataInspecao" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="conjuntoName" class="form-label">Conjunto</label>
+                                    <input type="text" class="form-control" id="conjuntoName" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="maquina" class="form-label">Máquina</label>
+                                    <input type="text" class="form-control" id="maquina" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="pecasProduzidas" class="form-label">Peças Produzidas</label>
+                                    <input type="number" class="form-control" id="pecasProduzidas" min="1" placeholder="Número de peças" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="inspetor" class="form-label">Inspetor</label>
+                                    <select class="form-select" id="inspetor" required>
+                                        <option value="">Selecione</option>
+                                        {% if not inspetor_logado %}
+                                            {% for inspetor in inspetores %}
+                                                <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                            {% endfor %}
+                                        {% else %}
+                                            <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                                        {% endif %}
+                                    </select>
+
+                                </div>
+                            </div>
+                            <div class="d-flex flex-column align-items-start mb-3">
+                                <h6>Inspeção</h6>
+                                <div class="d-flex justify-content-end gap-2 mt-2">
+                                    <input type="checkbox" name="checkbox-inspecao-serra" id="checkbox-inspecao-serra" class="inspection-checkbox">
+                                    <label for="checkbox-inspecao-serra">Inspeção Serra</label>
+                                </div>
+                                <div class="d-flex justify-content-end gap-2 mt-2">
+                                    <input type="checkbox" name="checkbox-inspecao-usinagem" id="checkbox-inspecao-usinagem" class="inspection-checkbox">
+                                    <label for="checkbox-inspecao-usinagem">Inspeção Usinagem</label>
+                                </div>
+                                <div class="d-flex justify-content-end gap-2 mt-2">
+                                    <input type="checkbox" name="checkbox-inspecao-furacao" id="checkbox-inspecao-furacao" class="inspection-checkbox">
+                                    <label for="checkbox-inspecao-furacao">Inspeção Furação</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção 3: Medições Técnicas -->
+                    <div class="card mb-4" id="medicoesTecnicas">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Medições Técnicas</h6>
+                        </div>
+                        <div class="card-body" id="medicoes-container">
+                            <!-- As seções de medição serão inseridas aqui dinamicamente -->
+                        </div>
+                    </div>
+                    <!-- Seção 4: Não Conformidades - Inicialmente oculta -->
+                    <div id="nonConformitySection" class="card mb-4" style="display: none;">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0">Detalhes das Não Conformidades</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">Adicione informações sobre cada não conformidade encontrada.</p>
+                            
+                            <div id="containerNonConformityItems">
+                                <!-- Template para item de não conformidade -->
+                                <div class="non-conformity-item border rounded p-3 mb-3" id="nonConformityItem1">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <h6 class="mb-0">Não Conformidade #1</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-nonconformity" onclick="removeNonConformityItem(1)">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <label for="fotoNaoConformidade1" class="form-label">Foto da não conformidade</label>
+                                            <label for="fotoNaoConformidade1" class="custom-file-upload form-control text-center py-2">
+                                                <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
+                                            </label>
+                                            <input type="file" id="fotoNaoConformidade1" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview1')" multiple>
+                                            <div id="imagePreview1" class="mt-2 text-center"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-outline-primary btn-add-nonconformity" onclick="addNonConformityItem()">
+                                    <i class="bi bi-plus-circle me-2"></i>Adicionar outra não conformidade
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary{% if modo_operador %} d-none{% endif %}" id="savePartialInspection">Salvar parcialmente</button>
+                <button type="button" class="btn btn-success" id="saveInspection">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>

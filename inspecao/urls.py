@@ -62,6 +62,7 @@ urlpatterns = [
     path('api/itens-inspecionados-serra-usinagem/', serra_usinagem.get_itens_inspecionados_serra_usinagem, name='itens-inspecionados-serra-usinagem'),
     path('api/itens-reinspecao-serra-usinagem/', serra_usinagem.get_itens_reinspecao_serra_usinagem, name='itens-reinspecao-estamserra-usinagemparia'),
     path('api/get-execucao-inspecao-serra-usinagem/', serra_usinagem.get_execucao_inspecao_serra_usinagem, name='execucao-inspecao-serra-usinagem'),
+    path('api/inspecao-operador-serra-usinagem/<int:inspecao_id>/', serra_usinagem.api_inspecao_operador_serra_usinagem, name='api-inspecao-operador-serra-usinagem'),
     
     path('api/itens-inspecao-corte/', corte.get_itens_inspecao_corte, name='itens-inspecao-corte'),
     path('api/itens-inspecionados-corte/', corte.get_itens_inspecionados_corte, name='itens-inspecionados-corte'),

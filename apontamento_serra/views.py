@@ -19,6 +19,7 @@ from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelt
 from core.utils import notificar_ordem
 from core.permissoes import tem_subacesso
 from inspecao.models import Inspecao
+from inspecao.views.serra_usinagem import contexto_inspecao_operador, inspecoes_pendentes_operador
 
 # Sub-acesso da tela /serra/ (ver core/permissoes.py e a migracao de sub-acessos)
 SUBACESSO_PLANEJAR = 'serra#planejar'
@@ -53,6 +54,13 @@ def obter_ou_criar_mp_serra(mp_codigo, descricao=None):
     if not mp_codigo:
         return None
 
+    # Às vezes chega o texto do select ("134223 - TUBO ...") no lugar do código:
+    # separa para não cadastrar uma MP com código e descrição juntos.
+    partes = re.match(r'^(\d+)\s+-\s+(.+)$', mp_codigo)
+    if partes:
+        mp_codigo = partes.group(1)
+        descricao = descricao if descricao and descricao.strip() != partes.string else partes.group(2)
+
     mp = Mp.objects.filter(codigo=mp_codigo).first()
     if mp:
         return mp
@@ -77,7 +85,9 @@ def planejamento(request):
                                                                     'operadores':operadores,
                                                                     'motivos_maquina_parada':motivos_maquina_parada,
                                                                     'motivos_exclusao': motivos_exclusao,
-                                                                    'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
+                                                                    'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR),
+                                                                    # Inspeção obrigatória ao finalizar (modal de inspeção no apontamento)
+                                                                    **contexto_inspecao_operador(request, 'serra')})
 
 @login_required
 def get_pecas_ordem(request, pk_ordem, name_maquina):
@@ -214,6 +224,7 @@ def atualizar_status_ordem(request):
                         ordem.propriedade.save()
 
                     pecas_restantes = []
+                    inspecoes_lote_final = []
                     for peca in pecas_geral:
                         peca_id = peca.get('peca')
                         planejada = peca.get('planejadas')
@@ -256,8 +267,10 @@ def atualizar_status_ordem(request):
                                 nova_ordem = criar_ordem_usinagem(dados_usinagem) 
 
                         # já criada no início da ordem: não duplica
-                        if not Inspecao.objects.filter(pecas_ordem_serra=peca_obj).exists():
-                            Inspecao.objects.create(pecas_ordem_serra=peca_obj)
+                        inspecao_peca = Inspecao.objects.filter(pecas_ordem_serra=peca_obj).first()
+                        if not inspecao_peca:
+                            inspecao_peca = Inspecao.objects.create(pecas_ordem_serra=peca_obj)
+                        inspecoes_lote_final.append(inspecao_peca)
 
                     nova_ordem = None
                     if finalizar_parcial and pecas_restantes:
@@ -311,6 +324,10 @@ def atualizar_status_ordem(request):
                     'maquina_id': ordem.maquina.id if ordem.maquina else None,
                 }
 
+
+                if status == 'finalizada':
+                    # Inspeções que o operador faz logo após finalizar (obrigatórias)
+                    response_payload['inspecoes'] = inspecoes_pendentes_operador(inspecoes_lote_final)
 
                 if status == 'finalizada' and 'nova_ordem' in locals() and nova_ordem:
                     response_payload['nova_ordem_id'] = nova_ordem.id
@@ -372,7 +389,7 @@ def get_ordens_criadas(request):
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
-            'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
+            'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y') if ordem.data_programacao else None,
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'maquina':ordem.maquina.nome if ordem.maquina else None,

@@ -4,6 +4,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Prefetch
 from django.db import transaction
 from django.views.decorators.http import require_POST, require_GET
+from django.contrib.auth.decorators import login_required
 
 from apontamento_serra.models import (
     MedidasProcessoSerraUsinagem,
@@ -63,6 +64,106 @@ def qtd_referencia_inspecao(peca_ordem, qtd_informada=None):
 def ordem_em_producao(peca_ordem):
     """Inspeção aberta no início da ordem: operador ainda produzindo, nada apontado."""
     return not peca_ordem.qtd_boa and peca_ordem.ordem.status_atual != "finalizada"
+
+
+def dados_inspecao_operador_serra_usinagem(inspecao):
+    """Dados para o operador abrir a inspeção no apontamento (serra/usinagem).
+
+    'pendente' = ainda não finalizada (sem execução ou execução não finalizada).
+    """
+    pecas_ordem = inspecao.pecas_ordem_serra or inspecao.pecas_ordem_usinagem
+    if pecas_ordem is None:
+        return None
+
+    ultima_execucao = (
+        DadosExecucaoInspecao.objects.filter(inspecao=inspecao)
+        .order_by("-num_execucao")
+        .first()
+    )
+    info_adicionais = (
+        getattr(ultima_execucao, "info_adicionais", None) if ultima_execucao else None
+    )
+    ordem = pecas_ordem.ordem
+
+    return {
+        "id": inspecao.id,
+        "pendente": not (info_adicionais and info_adicionais.inspecao_finalizada),
+        "ordem_id": ordem.id,
+        "ordem_numero": ordem.ordem,
+        "peca": f"{pecas_ordem.peca.codigo} - {pecas_ordem.peca.descricao}",
+        "maquina": ordem.maquina.nome if ordem.maquina else "N/A",
+        "qtd": qtd_referencia_inspecao(
+            pecas_ordem, info_adicionais.qtd_inspecionar if info_adicionais else None
+        ),
+        "em_producao": ordem_em_producao(pecas_ordem),
+    }
+
+
+def inspecoes_pendentes_operador(inspecoes):
+    """Inspeções da ordem recém-finalizada que o operador ainda precisa fazer:
+    só as não finalizadas (o inspetor pode já ter concluído durante a produção)
+    e de lotes com peça boa apontada."""
+    pendentes = []
+    for inspecao in inspecoes:
+        if inspecao is None:
+            continue
+        pecas_ordem = inspecao.pecas_ordem_serra or inspecao.pecas_ordem_usinagem
+        if not pecas_ordem or not (pecas_ordem.qtd_boa or 0) > 0:
+            continue
+        dados = dados_inspecao_operador_serra_usinagem(inspecao)
+        if dados and dados["pendente"]:
+            pendentes.append(dados)
+    return pendentes
+
+
+def contexto_inspecao_operador(request, setor):
+    """Contexto do modal de inspeção no apontamento (setor: 'serra' ou 'usinagem').
+
+    O inspetor é o próprio usuário logado. O envio procura o inspetor por id do
+    Profile (Profile.objects.get(id=...)), então aqui vai o id do Profile.
+    """
+    profile = (
+        Profile.objects.filter(user=request.user).first()
+        if request.user.is_authenticated
+        else None
+    )
+    inspetores = []
+    if not profile:
+        inspetores = [
+            {"nome_usuario": p.user.username, "id": p.id}
+            for p in Profile.objects.filter(
+                tipo_acesso="inspetor",
+                permissoes__nome="controle-de-qualidade/serra-usinagem",
+            ).select_related("user")
+        ]
+    return {
+        "modo_operador": True,
+        "setor_operador": setor,
+        "inspetor_logado": (
+            {"nome_usuario": request.user.username, "id": profile.id} if profile else None
+        ),
+        "inspetores": inspetores,
+    }
+
+
+@login_required
+@require_GET
+def api_inspecao_operador_serra_usinagem(request, inspecao_id):
+    """Usada pelo apontamento para reabrir a inspeção obrigatória após recarregar a página."""
+    inspecao = (
+        Inspecao.objects.select_related(
+            "pecas_ordem_serra__ordem__maquina",
+            "pecas_ordem_serra__peca",
+            "pecas_ordem_usinagem__ordem__maquina",
+            "pecas_ordem_usinagem__peca",
+        )
+        .filter(id=inspecao_id)
+        .first()
+    )
+    dados = dados_inspecao_operador_serra_usinagem(inspecao) if inspecao else None
+    if not dados:
+        return JsonResponse({"pendente": False, "motivo": "nao_encontrada"})
+    return JsonResponse(dados)
 
 
 def inspecao_serra_usinagem(request):
